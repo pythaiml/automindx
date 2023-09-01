@@ -1,6 +1,5 @@
 # Chunk4096.py<br />
-Overview<br />
-This Python script utilizes the Gradio library, PyTorch, and the Transformers library to perform text chunking and natural language generation. It defines a Chunker class responsible for breaking down input text into chunks and generating a response for each chunk. The chunk size is set to 4096 tokens.<br />
+This Python script creates a class chunk4096.py utilizing the Gradio library, PyTorch, and the Transformers library to perform text chunking and natural language generation. It defines a Chunker class responsible for breaking down input text into chunks and generating a response for each chunk. The chunk size is set to 4096 tokens.<br />
 
 # Dependencies<br />
 Gradio<br />
