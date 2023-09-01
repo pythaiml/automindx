@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+
+# tested on Ubuntu 22.04.6 LTS Linux Mint 21.2 and Manjaro Linux pacman users choose no to update system request
+
+# automindx (c) 2023 codephreak MIT license
+
+# requirements Linux sudo
+# recognizes user shell bash zsh
+# script promptes user to update system to current using apt
+# checks for conda and updates or installs conda
+# actives automind conda environment
+# runs conda init USER_SHELL
+# clones automind and enters directory
+# installs automind with default model llama-2-7b-chat-codeCherryPop.ggmlv3.q4_1.bin
+# launches boilerplate Gradio instruction response and expose API to localhost and globalhost
+# Professor Codephreak is ...
+
+# Detect user's shell and set shell initialization file
+USER_SHELL=$(env | grep SHELL | awk -F'=' '{print $2}')
+if [[ "$USER_SHELL" == *"bash"* ]]; then
+    INIT_FILE=".bashrc"
+elif [[ "$USER_SHELL" == *"zsh"* ]]; then
+    INIT_FILE=".zshrc"
+elif [[ "$USER_SHELL" == *"csh"* ]]; then
+    INIT_FILE=".cshrc"
+else
+    echo "Unsupported shell: $USER_SHELL"
+    exit 1
+fi
+
+# Add Script Directories to PATH
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/$INIT_FILE
+source ~/$INIT_FILE
+
+# Ask user if they want to upgrade the system
+read -p "Would you like to upgrade your apt based system? (y/n): " UPGRADE_SYSTEM
+if [[ $UPGRADE_SYSTEM == "y" || $UPGRADE_SYSTEM == "Y" ]]; then
+    sudo apt-get update
+    sudo apt-get upgrade -y
+    echo "System upgrade completed."
+else
+    echo "Skipping system upgrade."
+fi
+
+# Check if Miniconda is already installed
+if command -v conda &> /dev/null; then
+    echo "Miniconda is already installed."
+    read -p "Do you want to:
+1) Install the latest existing Miniconda installation for Linux x64
+2) Continue using the existing Miniconda installation
+Enter your choice (1/2): " CONDA_INSTALL_CHOICE
+
+    if [[ $CONDA_INSTALL_CHOICE == "1" ]]; then
+        # Update the existing Miniconda installation
+        wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+        chmod +x Miniconda3-latest-Linux-x86_64.sh
+        sudo ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda3 -u
+        echo 'export PATH="$HOME/miniconda3/bin:$PATH"' >> ~/$INIT_FILE
+        source ~/$INIT_FILE
+        # Remove the installer
+        rm Miniconda3-latest-Linux-x86_64.sh
+        # Change ownership of the miniconda3 directory to the user
+        sudo chown -R $USER:$USER $HOME/miniconda3
+    elif [[ $CONDA_INSTALL_CHOICE == "2" ]]; then
+        echo "Continuing with existing Miniconda installation."
+    else
+        echo "Invalid choice. Exiting."
+        exit 1
+    fi
+else
+    # Miniconda is not installed, proceed with installation
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    chmod +x Miniconda3-latest-Linux-x86_64.sh
+    sudo ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda3
+    echo 'export PATH="$HOME/miniconda3/bin:$PATH"' >> ~/$INIT_FILE
+    source ~/$INIT_FILE
+    # Remove the installer
+    rm Miniconda3-latest-Linux-x86_64.sh
+    # Change ownership of the miniconda3 directory to the user
+    sudo chown -R $USER:$USER $HOME/miniconda3
+fi
+
+echo "Initializing Miniconda for $USER_SHELL..."
+# Initialize conda for the user's shell
+if [[ "$USER_SHELL" == *"bash"* ]]; then
+    conda init bash
+    source ~/.bashrc
+    conda activate bash
+elif [[ "$USER_SHELL" == *"zsh"* ]]; then
+    conda init zsh
+    source ~/.zshrc
+    conda activate bash
+elif [[ "$USER_SHELL" == *"csh"* ]]; then
+    conda init tcsh
+    source ~/.cshrc
+    conda activate tcsh
+fi
+
+
+# show details of the conda install
+conda --version
+
+# conda activate automindx environment check
+AUTOMIND_ENV=$(conda info --envs | grep automind)
+if [[ ! -z "$AUTOMIND_ENV" ]]; then
+    echo "automindx environment already exists."
+    read -p "Do you want to overwrite the existing automindx environment? (y/n): " OVERWRITE_AUTOMIND
+
+    if [[ $OVERWRITE_AUTOMIND == "y" || $OVERWRITE_AUTOMIND == "Y" ]]; then
+        # Deactivate current environment before removing
+        conda deactivate
+        conda remove --name automindx --all -y
+        echo "existing automindx environment has been removed."
+    else
+        echo "continuing with existing automindx environment."
+    fi
+fi
+
+# Create and initialize automindx Miniconda environment
+echo "creating automindx"
+conda create --name automindx python=3.11.4 -y
+
+# Activate automindx environment if not already activated
+if [[ $(conda info --envs | grep automind) == "" ]]; then
+    echo "Activating automindx environment..."
+    eval "$($HOME/miniconda3/bin/conda shell.bash hook)"
+    conda activate automindx
+fi
+
+# Source the initialization file
+source ~/$INIT_FILE
+
+# show details of the Miniconda automind install environment
+conda env list
+conda --version
+
+# Check if pip is installed
+if ! command -v pip &> /dev/null; then
+    echo "pip is not installed. Installing pip..."
+    # Install pip using sudo apt
+    sudo apt install python3-pip
+    echo "pip installed successfully"
+    echo "upgrading pip"
+    sudo -H pip3 install --upgrade pip
+else
+    echo "pip is already installed"
+fi
+
+# Install gradio, psutil, llama2_wrapper, ujson and fire with specific versions
+pip install gradio==3.37.0 psutil==5.9.5 llama2_wrapper==0.1.7 ujson==5.8.0 fire==0.5.0
+
+# Clone the 'automindx' repository and install its requirements
+echo "cloning automindx from pythaiml"
+git clone https://github.com/pythaiml/automindx
+cd automindx
+pip install --upgrade pip
+pip --version
+pip install -r requirements.txt
+
+# Run UIUX
+python uiux.py --model_name="TheBloke/llama2-7b-chat-codeCherryPop-qLoRA-GGML" --tokenizer_name="TheBloke/llama2-7b-chat-codeCherryPop-qLoRA-GGML" --model_type="ggml" --save_history --file_name="llama-2-7b-chat-codeCherryPop.ggmlv3.q4_1.bin"
+
+#README download automindx.install
+#deploy automindx.install from terminal
+#chmod +x automindx.install && ./automindx.install
