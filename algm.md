@@ -33,6 +33,6 @@ Usage
 
 Example Use Case
 
-The aglm.py script could be used as part of a larger system that utilizes conversation memory to generate context-aware responses in a chatbot or virtual assistant application. It reads conversation history from memory files, processes the data in batches to manage memory usage, generates responses using a pre-trained language model, and prints the generated response to the console.
+The aglm.py script can be used as part of larger systems utilizing conversation memory to generate context-aware responses in a chatbot or virtual assistant application. It reads conversation history from memory files, processes the data in batches to manage memory usage, generates responses using a pre-trained language model, and prints the generated response to the console.
 
 By integrating the aglm.py module with other components, developers can create more intelligent and contextually-aware conversational agents.
