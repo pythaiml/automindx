@@ -3,6 +3,7 @@
 # Script Description:
 # This script automates the setup and installation of the automindx environment, including Miniconda, required packages, and the automindx repository.
 # Tested on Ubuntu 22.04.6 LTS, Linux Mint 21.2, and Manjaro Linux
+# model experiences an error on inputs larger than 4096 characters 4096chunk is not working
 # creates a local language model running Professor Codephreak with a desire to create automindx in a conda environment with the default Gradio interface
 
 # Copyright Information:
