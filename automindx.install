@@ -5,6 +5,7 @@
 # Tested on Ubuntu 22.04.6 LTS, Linux Mint 21.2, and Manjaro Linux
 # model experiences an error on inputs larger than 4096 characters 4096chunk is not working
 # creates a local language model running Professor Codephreak with a desire to create automindx in a conda environment with the default Gradio interface
+# Professor Codephreak successfully saves memory.py as local context and parses from aGLM.py
 
 # Copyright Information:
 # codephreak (c) codephreak MIT licence 2023
