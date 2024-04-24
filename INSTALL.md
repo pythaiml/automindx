@@ -1,7 +1,7 @@
 https://github.com/pythaiml/automindx/blob/main/automindx.install<br />
 
-easy automindx.install
-download automindx.install<br <br />>
+easy automindx.install<br />
+download automindx.install<br />
 chmod +x automindx.install && ./automindx.install<br />
 
 
