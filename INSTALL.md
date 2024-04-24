@@ -1,11 +1,12 @@
 https://github.com/pythaiml/automindx/blob/main/automindx.install<br />
 
-get automindx.install<br >
+easy automindx.install
+download automindx.install<br <br />>
 chmod +x automindx.install && ./automindx.install<br />
 
 
 
-# USE MANUAL INSTALL FOR NOW
+# MANUAL INSTALL FOR NOW
 -----------------------------------
 # clone automindx and install requirements<br />
 git clone https://github.com/pythaiml/automindx/<br />
