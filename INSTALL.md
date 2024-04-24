@@ -39,13 +39,7 @@ To install right click "Save link as ..."[automindx.install](https://github.com/
 
 ##  [automind.install]([https://github.com/pythaiml/automindx/blob/main/automindx.install)
 
-detailed and verbose procedure
-1. Right-click the following link:  [automindx.install](https://github.com/pythaiml/automindx/blob/main/automindx.install)
-
-2. Choose "Save link as..." or "Download linked file" from the context menu.
-3. Select a location on your computer to save the file.
-4. from the terminal
-5. chmod +x automind.install && ./automind.install
+chmod +x automind.install && ./automind.install
 
 
 ---------------------------------<br />
