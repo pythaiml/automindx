@@ -8,6 +8,31 @@ Gradio interacts with html javascript and css <a href="https://www.gradio.app/gu
 <a href="https://www.gradio.app/guides/getting-started-with-the-js-client">Gradio Javascript Client</a><br />
 Documentation: codephreak = uiux.py + memory.py + automind.py + aglm.py<br />
 
+## ⚡ Quickstart — modern, actually-loads path (Ollama)
+
+The classic `uiux.py` / `hfUIUX.py` load a multi-GB model **before** the UI
+renders, so on modest hardware the window never appears. `ollama_codephreak.py`
+inverts that: the model runs in the **Ollama** daemon and the Gradio UI loads
+instantly (and degrades gracefully if no model is present). It includes a live
+**token counter** (prompt + completion + tok/s) and a model picker for local and
+`:cloud` models.
+
+```bash
+pip install -r requirements-ollama.txt   # gradio + requests only — no torch
+ollama serve                             # in another terminal
+ollama pull qwen3:0.6b                    # small local model for modest hardware
+python3 ollama_codephreak.py             # → http://localhost:7860
+```
+
+> codephreak is **AGLM** — an augmentation layer, not a model. The full AGLM
+> cognitive console (Socratic, Logic, BDI, MASTERMIND, …) and an AI-SDK
+> participant UI live at **https://github.com/pythaiml/aglm**.
+
+**Recent audit & fixes:** see [AUDIT.md](AUDIT.md) for the bugs found and fixed in
+this pass (missing `import os` in `hfapp.py`, a non-existent `app.py` Docker
+entrypoint, a duplicated/incomplete `memory.py`, signature mismatches in
+`hfUIUX.py`, and an invalid CUDA-only kwarg in `aglm.py`).
+
 # User Interface and Interaction (uiux.py)<br />
 
 (uiux.py) provides a user interface using the Gradio library to facilitate user interaction.

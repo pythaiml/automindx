@@ -8,15 +8,21 @@ from automind import format_to_llama_chat_style
 
 
 class LlamaModel:
-    def __init__(self, model_name, models_folder):
+    def __init__(self, model_name, models_folder="./models"):
         self.model_name = model_name
         self.models_folder = models_folder
         self.model, self.tokenizer = self.initialize_model()
 
     def initialize_model(self):
-        model_path = os.path.join(self.models_folder, self.model_name)
-        model = AutoModelForCausalLM.from_pretrained(model_path, device="cuda")
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        # Accept either a local model directory (models_folder/model_name) or a
+        # bare Hugging Face repo id (e.g. "microsoft/phi-2").
+        local_path = os.path.join(self.models_folder, self.model_name)
+        source = local_path if os.path.isdir(local_path) else self.model_name
+        # device_map="auto" runs on GPU when available and falls back to CPU.
+        # (The previous device="cuda" kwarg is not valid for from_pretrained and
+        # crashed on CPU-only hosts.)
+        model = AutoModelForCausalLM.from_pretrained(source, device_map="auto")
+        tokenizer = AutoTokenizer.from_pretrained(source)
         return model, tokenizer
 
     def generate_contextual_output(self, conversation_context):
@@ -46,7 +52,8 @@ def main():
             with open(memory_file, "r", encoding="utf-8") as file:
                 memory_data = ujson.load(file)
                 for dialog in memory_data:
-                    conversation_context += f"{dialog['user_input']}\n{dialog['model_response']}\n"
+                    # memory.py saves {"instruction", "response"} — match those keys.
+                    conversation_context += f"{dialog['instruction']}\n{dialog['response']}\n"
 
     model_name_path = os.path.join(models_folder, "model_name.txt")
     with open(model_name_path, "r") as file:
