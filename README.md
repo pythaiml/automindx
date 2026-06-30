@@ -28,6 +28,9 @@ python3 ollama_codephreak.py             # → http://localhost:7860
 > cognitive console (Socratic, Logic, BDI, MASTERMIND, …) and an AI-SDK
 > participant UI live at **https://github.com/pythaiml/aglm**.
 
+**Architecture:** see [TECHNICAL.md](TECHNICAL.md) for the module map, entrypoints,
+and the Ollama path.
+
 **Recent audit & fixes:** see [AUDIT.md](AUDIT.md) for the bugs found and fixed in
 this pass (missing `import os` in `hfapp.py`, a non-existent `app.py` Docker
 entrypoint, a duplicated/incomplete `memory.py`, signature mismatches in
