@@ -418,3 +418,22 @@ h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -.01em; }
 .sagi-view { position: relative; }
 .sagi-view > *:not(.sagi-bg) { position: relative; z-index: 1; }
 .sagi-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: .55; border-radius: 14px; }
+
+/* sAGI face — eyes (camera+webcam), mouth (oscilloscope), ears (audio-in). */
+.sagiface { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 14px;
+  padding: 16px; border-radius: 14px; background: linear-gradient(180deg, rgba(8,13,21,.7), rgba(6,10,18,.7));
+  border: 1px solid var(--line); box-shadow: var(--e2), var(--bevel); }
+.sf-eyes { display: flex; gap: 40px; }
+.sf-eye { position: relative; width: 96px; height: 96px; border-radius: 50%; overflow: hidden;
+  border: 2px solid rgba(46,230,166,.4); box-shadow: 0 0 18px -4px var(--accent), inset 0 0 20px rgba(0,0,0,.6); background: #050a12; }
+.sf-eye video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.sf-cap { position: absolute; bottom: 3px; left: 0; right: 0; text-align: center; font-family: var(--mono); font-size: 9px; color: var(--dim); text-shadow: 0 1px 3px #000; }
+.sf-mouth { display: flex; align-items: center; gap: 14px; width: 100%; max-width: 520px; }
+.sf-scope { flex: 1; height: 84px; border-radius: 10px; background: radial-gradient(circle at 50% 50%, rgba(46,230,166,.06), transparent 70%), #060b12;
+  border: 1px solid var(--glass-brd); box-shadow: inset 0 0 24px rgba(0,0,0,.6); }
+.sf-ear { width: 15px; height: 15px; border-radius: 50%; background: #24344c; transition: background .12s, box-shadow .12s;
+  border: 1px solid var(--glass-brd); flex: none; }
+.sf-ear.on { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+.sf-ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.sf-badge { font-size: 11px; color: var(--accent); font-family: var(--mono); }
+.sf-err { font-size: 11px; color: var(--bad); }
