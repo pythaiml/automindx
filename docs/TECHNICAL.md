@@ -18,29 +18,54 @@ modest hardware the window may never appear. `ollama_codephreak.py` keeps the mo
 in the Ollama daemon, so the Gradio UI loads immediately and degrades gracefully
 when no model is present.
 
-## 2. Module architecture
+## 2. Repository map (current)
 
 ```
-ollama_codephreak.py ─┐                         (modern path)
-                      ├─► automind.py  (DEFAULT_SYSTEM_PROMPT, format_to_llama_chat_style)
-uiux.py / hfUIUX.py ──┤                         (legacy transformers path)
-                      ├─► aglm.py      (LlamaModel: transformers load + generate)
-hfapp.py ─────────────┘                         (legacy GGML path, self-contained)
-                      └─► memory.py    (save / load / export conversation JSON)
+automindX/
+  codephreak-console/   Next.js + Vercel AI SDK console (the flagship UI)
+      app/api/chat        native-Ollama bridge: tool-calling (real filesystem access)
+                          + subtask decomposition on the tool-call limit
+      app/ Substrate · SagiVisual · SagiBackground · SagiFace · ClaudeTerminal
+                          living WebGL substrate · sAGI constellation · evolving
+                          geometry · sensorium (oscilloscope/TTS · mic · cameras) ·
+                          interactive PTY terminal (call `claude` from your subscription)
+      lib/persona.ts      expandable personas: base template + individuality layer,
+                          per-persona avatars (Codephreak, Savante, sAGI, jAImla, …)
+      pty-server.js       local-only node-pty ⇄ WebSocket bridge for the terminal
+  services/             decoupled service layer — see SERVICES.md
+      Memory (SQLite) · RageMemory (pgvector/pgvectorscale) · get_memory() ·
+      ModelService (lazy Ollama) · InferenceOrchestrator · ModelRegistry ·
+      secrets (keyring→env) · self_audit (codephreak reads the real source)
+  aglm/                 the Autonomous General Learning Model package (PODA cycle)
+  sagi/                 the self-building sAGI package (agnostic, modular)
+      POINT_OF_DEPARTURE.md · seed/ (the 3 seed modules) · core/interface.md
+      runtime/          executable: Host {log,store,callModel,on,emit} · the three
+                        seed modules (be thyself · do no harm · grow thyself) ·
+                        gitmind (git-like memory tree) · rage_sync (save trees→RAGE)
+  4096/                 the 4096-token issue: context4096.py, chunk4096.py + docs
+  scripts/              automindx.install, run_codephreak_console.sh
+  automind.py           thin façade → services (chat) + persona/format helpers
+  codephreak.py         self-improving persona engine (realtime 👍/👎 → directives)
+  ollama_codephreak.py  modern Gradio chat (model picker + token counter)
+  uiux.py hfUIUX.py hfapp.py llama_model.py memory.py   legacy transformers/GGML path
 ```
 
-- **automind.py** — the codephreak persona (`DEFAULT_SYSTEM_PROMPT`) and
-  `format_to_llama_chat_style(memory)`, which renders a `[[user, response], …]`
-  history (last entry `[user, None]`) into Llama-2 `[INST]…[/INST]` chat format.
-- **aglm.py** — `LlamaModel(model_name, models_folder="./models")`. Resolves a
-  local model directory **or** a bare Hugging Face repo id, loads with
-  `device_map="auto"` (CPU or GPU), and `generate_contextual_output(memory)`
-  formats + tokenizes + generates.
-- **memory.py** — `save_conversation_memory(memory)` writes
-  `./memory/memory_<ts>.json` as `[{instruction, response}]`;
-  `load_conversation_memory(path)` and `export_conversation(memory, file)` round-trip.
-- **chunk4096.py / 4096chunk.md** — guard against inputs exceeding the 4096-token
-  context of the original GGML model.
+- **automind.py** — thin façade: `chat(user_input, session_id)` delegates to the
+  service layer; also exports the codephreak persona (`DEFAULT_SYSTEM_PROMPT`) and
+  `format_to_llama_chat_style`.
+- **services/** — the production layer (memory · model · orchestrator · registry ·
+  secrets · self-audit). See [SERVICES.md](SERVICES.md).
+- **sagi/runtime/** — the point of departure made executable + the **gitmind** memory
+  tree saved into **RAGE**. See [../sagi/POINT_OF_DEPARTURE.md](../sagi/POINT_OF_DEPARTURE.md)
+  and [savethetrees.md](savethetrees.md).
+- **llama_model.py** *(was `aglm.py`)* — `LlamaModel`: local dir or HF id, `device_map="auto"`.
+- **memory.py** — legacy JSON conversation memory; the service layer uses SQLite/pgvector.
+- **4096/context4096.py** — token-aware sliding window for the original 4096-token model.
+
+> **Reality note.** Models run in the **Ollama daemon** (local + free `:cloud`), not an
+> in-process torch checkpoint; self-improvement is prompt-space (feedback → learned
+> directives). The service layer, registry, secrets, self-audit, and sAGI runtime are
+> real and tested (`python3 -m pytest`).
 
 ## 3. The modern entrypoint (`ollama_codephreak.py`)
 
