@@ -4,7 +4,7 @@ import { useChat } from '@ai-sdk/react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { BUILTIN_PERSONAS, CODEPHREAK_PERSONA, type Persona } from '@/lib/persona';
+import { BUILTIN_PERSONAS, CODEPHREAK_PERSONA, PERSONA_TEMPLATES, composePersonaPrompt, type Persona } from '@/lib/persona';
 import { LS, CODEPHREAK_NFT } from '@/lib/store';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useModels } from '@/hooks/useModels';
@@ -539,7 +539,7 @@ export default function Console() {
           {/* PERSONA CREATOR */}
           <section className={'view' + (tab === 'persona' ? ' active' : '')}>
             <h1>.persona</h1>
-            <p className="lead">The active persona <b>is</b> the system prompt sent to the model — edit it here and it takes effect on the next message. Create as many as you like; the default is the authentic Professor Codephreak prompt.</p>
+            <p className="lead">Personas are <b>expandable</b>: pick a base template (Professor Codephreak, Savante/sAGI, jAImla, …, or Standard) and layer your own <b>individuality</b> on top. The combined text <b>is</b> the system prompt sent to the model. Create as many as you like.</p>
             <div className="card">
               <div className="row" style={{ marginBottom: 12 }}>
                 {personas.map((p) => (
@@ -548,7 +548,7 @@ export default function Console() {
                     {p.id === activePersona ? '● ' : '○ '}{p.name}
                   </span>
                 ))}
-                <button className="btn ghost sm" onClick={() => { const id = uid(); setPersonas((ps) => [...ps, { id, name: 'New persona', prompt: '' }]); setActivePersona(id); }}>+ New</button>
+                <button className="btn ghost sm" onClick={() => { const id = uid(); setPersonas((ps) => [...ps, { id, name: 'New persona', baseId: 'codephreak', individual: '', prompt: composePersonaPrompt('codephreak', '') }]); setActivePersona(id); }}>+ New</button>
               </div>
               <div className="row" style={{ marginBottom: 10 }}>
                 <input style={{ flex: 1 }} value={persona.name} onChange={(e) => setPersonas((ps) => ps.map((p) => p.id === persona.id ? { ...p, name: e.target.value } : p))} />
@@ -557,9 +557,31 @@ export default function Console() {
                 <button className="btn ghost sm" onClick={() => copy(persona.prompt, 'persona')}>{copied === 'persona' ? '✓' : '⧉ copy'}</button>
                 <button className="btn ghost sm" title="pull learned directives from codephreak.py" onClick={syncLearned}>⟳ sync learned</button>
               </div>
-              <textarea style={{ width: '100%', minHeight: 260, fontFamily: 'var(--mono)', fontSize: 12.5, lineHeight: 1.6 }}
-                value={persona.prompt} onChange={(e) => setPersonas((ps) => ps.map((p) => p.id === persona.id ? { ...p, prompt: e.target.value } : p))} />
-              <div className="small dim" style={{ marginTop: 8 }}>{persona.prompt.length} chars · this exact text is the system prompt</div>
+              {(() => {
+                const curBase = persona.baseId ?? (BUILTIN_IDS.has(persona.id) ? persona.id : 'blank');
+                const setBase = (b: string) => setPersonas((ps) => ps.map((p) => p.id === persona.id ? { ...p, baseId: b, prompt: composePersonaPrompt(b, p.individual) } : p));
+                const setIndividual = (iv: string) => setPersonas((ps) => ps.map((p) => p.id === persona.id ? { ...p, baseId: curBase, individual: iv, prompt: composePersonaPrompt(curBase, iv) } : p));
+                return (
+                  <div className="persona-layer">
+                    <div className="row" style={{ alignItems: 'center', marginBottom: 8 }}>
+                      <span className="small dim">Base template</span>
+                      <select value={curBase} onChange={(e) => setBase(e.target.value)}>
+                        {PERSONA_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                      </select>
+                      <span className="small dim">＋ your individuality, layered on top ↓</span>
+                    </div>
+                    <textarea placeholder="Individuality — the traits, voice, focus, and rules that make this persona your own, layered on top of the template above…"
+                      style={{ width: '100%', minHeight: 110, fontFamily: 'var(--mono)', fontSize: 12.5, lineHeight: 1.6 }}
+                      value={persona.individual ?? ''} onChange={(e) => setIndividual(e.target.value)} />
+                  </div>
+                );
+              })()}
+              <details className="persona-raw" style={{ marginTop: 10 }}>
+                <summary className="small dim">Effective system prompt (advanced — edit raw) · {persona.prompt.length} chars</summary>
+                <textarea style={{ width: '100%', minHeight: 220, fontFamily: 'var(--mono)', fontSize: 12.5, lineHeight: 1.6, marginTop: 8 }}
+                  value={persona.prompt} onChange={(e) => setPersonas((ps) => ps.map((p) => p.id === persona.id ? { ...p, prompt: e.target.value } : p))} />
+              </details>
+              <div className="small dim" style={{ marginTop: 8 }}>{persona.prompt.length} chars · template + individuality is the exact system prompt sent</div>
               {learned && (
                 <div className="small" style={{ marginTop: 10, color: learned.length ? 'var(--accent)' : 'var(--dim)' }}>
                   {learned.length
