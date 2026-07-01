@@ -54,6 +54,26 @@ Chat ▲/▼  →  /api/feedback  →  codephreak.py  (records + learns)
 
 HTTP API (stdlib only): `GET /persona?id=<persona>`, `POST /feedback`, `GET /stats`.
 
+## ⌘ Terminal — call Claude from your subscription
+
+The **⌘ Terminal** button opens a real interactive terminal embedded in the dapp
+(xterm.js ⇄ `pty-server.js`, a WebSocket PTY bridge bound to `127.0.0.1:3101`). Its
+shell opens in the **project root**, so you can:
+
+```
+claude          # sign in with your Claude subscription (browser OAuth), then
+                # drive Claude Code against automindX — from the dapp, for the dapp
+```
+
+No API key — it uses the CLI's subscription login. The launcher starts the bridge
+automatically; standalone: `npm run pty` (from `codephreak-console/`). It is
+local-only and never exposed off-box. This is the [aiterm](https://github.com/aiterm)
+("augmented intelligence terminal") thesis realized inside the console.
+
+**sAGI with Claude.** The headless builder is backend-agnostic too:
+`python3 sagi_build.py --backend claude-cli` grows sAGI using your Claude
+subscription CLI (or `--backend claude-api` with `ANTHROPIC_API_KEY`).
+
 ## Architecture note
 
 The chat route bridges Ollama's **native** `/api/chat` into an AI SDK
