@@ -12,7 +12,8 @@
 #   • two commit tiers — LOCAL (per-timestamp timeline, vertical scaling) vs GLOBAL
 #     (expansion / massive-upgrade milestones, horizontal scaling), on their own ref;
 #   • .history alignment — snapshots are reachable by .history timestamp (at_moment);
-#   • RAGE embedding — trees are indexable into pgvectorscale for semantic recall.
+#   • RAGE embedding — trees are indexable into pgvectorscale for semantic recall
+#     (rage_sync.RageSync; the mindX RAGE substrate, https://rage.pythai.net).
 from __future__ import annotations
 
 import hashlib
@@ -23,13 +24,16 @@ from typing import Any, Dict, List, Optional
 
 
 class GitMind:
-    def __init__(self, root: str, source_dir: str = "modules"):
+    def __init__(self, root: str, source_dir: str = "modules", on_commit=None):
         self.root = os.path.abspath(root)
         self.gm = os.path.join(self.root, ".gitmind")
         self.objects = os.path.join(self.gm, "objects")
         self.head_path = os.path.join(self.gm, "HEAD")
         self.global_path = os.path.join(self.gm, "GLOBAL")   # tip of the global chain
         self.src = os.path.join(self.root, source_dir)
+        # Optional RAGE sink: called (commit_hash, commit_obj) after each new commit,
+        # e.g. to embed the tree into pgvectorscale (see rage_sync.RageSync).
+        self.on_commit = on_commit
         os.makedirs(self.objects, exist_ok=True)
 
     # --- content-addressed object store (dedup by hash) ---
@@ -95,6 +99,11 @@ class GitMind:
         if scope == "global":
             with open(self.global_path, "w", encoding="utf-8") as f:
                 f.write(ch)
+        if self.on_commit:
+            try:
+                self.on_commit(ch, obj)                        # e.g. embed the tree into RAGE
+            except Exception:
+                pass                                            # a RAGE sink must never break a commit
         return ch
 
     def global_commit(self, moment: Any = None, message: str = "", ts: Optional[int] = None) -> str:
