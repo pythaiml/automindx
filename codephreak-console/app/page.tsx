@@ -103,6 +103,18 @@ export default function Console() {
     if (termSendRef.current) termSendRef.current(cmd);
     setSagiChooser(false);
   };
+  const [savingPt, setSavingPt] = useState(false);
+  const [savept, setSavept] = useState<any>(null);
+  async function savePoint() {
+    setSavingPt(true);
+    try {
+      const r = await fetch('/api/sagi/savepoint', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label: sagiGoal || '' }) });
+      const j = await r.json();
+      if (j.ok) { setSavept(j); if (j.text) copy(j.text, 'savepoint'); }
+      else setSavept({ error: j.error || 'save failed' });
+    } catch (e: any) { setSavept({ error: String(e?.message || e) }); }
+    setSavingPt(false);
+  }
   const [autonomous, setAutonomous] = useState(true);   // self-provision (auto-pull) — default ON
   const [sagi, setSagi] = useState(false);              // sAGI mode from Savante — default OFF
 
@@ -482,7 +494,15 @@ export default function Console() {
                   : null}
                 <button className="btn ghost sm" onClick={() => setSagiLog([])} disabled={!sagiLog.length || sagiRunning}>Reset</button>
                 <button className="btn ghost sm" onClick={() => download('sagi-architecture.md', sagiLog.map((s) => `## ${s.step}. ${s.title}\n\n${s.body}`).join('\n\n---\n\n'))} disabled={!sagiLog.length}>↓ export</button>
+                <button className="btn ghost sm" onClick={savePoint} disabled={savingPt || !(sagiDisk.count || sagiLog.length)} title="save this moment: gitmind commit + .history + RAGE + shareable export (copied to clipboard)">{savingPt ? 'saving…' : '⭑ Save point'}</button>
               </div>
+              {savept && (
+                <div className="notice" style={{ marginBottom: 12, color: savept.error ? 'var(--bad)' : 'var(--accent)' }}>
+                  {savept.error
+                    ? <>⭑ save failed — {savept.error}</>
+                    : <>⭑ <b>point of save</b> · gitmind <span className="mono">{String(savept.commit).slice(0, 12)}</span> · {savept.modules} module(s) · embedded {savept.rage_saved} into RAGE · {copied === 'savepoint' ? 'shareable export copied ✓' : <button className="btn ghost sm" onClick={() => copy(savept.text, 'savepoint')}>⧉ copy shareable</button>} <span className="dim small">→ {String(savept.export).replace(/.*\/sagi\//, 'sagi/')}</span></>}
+                </div>
+              )}
               {!autonomous && (
                 <div className="composer" style={{ marginBottom: 12 }}>
                   <textarea id="sagi-input" rows={1} placeholder="Direct the next build step (a step = one input → response)…"

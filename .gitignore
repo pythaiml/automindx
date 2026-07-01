@@ -37,3 +37,6 @@ sagi/goal.txt
 
 # sAGI gitmind memory tree (runtime object store)
 sagi/.gitmind/
+
+# sAGI point-of-save exports (runtime)
+sagi/savepoints/
