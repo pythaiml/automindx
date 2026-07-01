@@ -46,9 +46,20 @@ python3 ollama_codephreak.py             # → http://localhost:7860
 
 | Path | File | Loads | Requires |
 |---|---|---|---|
-| **Modern (recommended)** | `ollama_codephreak.py` | **instantly** | a running Ollama daemon |
+| **AI SDK console (definitive)** | `codephreak-console/` + `codephreak.py` | **instantly** | Ollama + Node (see [CODEPHREAK_CONSOLE.md](CODEPHREAK_CONSOLE.md)) |
+| Modern Gradio | `ollama_codephreak.py` | **instantly** | a running Ollama daemon |
 | Legacy GGML (CPU) | `hfapp.py` | after model download | `llama-cpp-python` + ~4 GB model |
 | Legacy transformers | `uiux.py` / `hfUIUX.py` | after model load | `torch` + `transformers` |
+
+The **[Professor Codephreak AI SDK console](CODEPHREAK_CONSOLE.md)** is the
+flagship UI: streaming chat on the Vercel AI SDK v7 with gpt-oss by default,
+reasoning, a token counter, advanced **and** scientific sampling, a `.persona`
+creator (Codephreak, automindX, jAImla, Savante, …), `.history`, export/copy, and
+a self-improving feedback loop (`codephreak.py`).
+
+```bash
+./run_codephreak_console.sh      # engine :5001 + console :3100
+```
 
 ## Modules
 
