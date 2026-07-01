@@ -100,6 +100,8 @@ The composition rule is mechanical (`composePersonaPrompt`, `persona.ts:56-61`):
 
 ## The First Modules to Ship
 
+> These three now ship as **tracked seed modules** in [`sagi/seed/`](seed/) — copy them into an individual's `$SAGI_DIR/modules/` to bootstrap (see [seed/README.md](seed/README.md)).
+
 Exactly three, each real `activate(host)` code over the agnostic host surface (`interface.md:11-12`), each closing a gap the audit found (persona not layered; manifest desynced from disk; prose-only modules, no kernel). Together: **be thyself, keep thyself honest, grow thyself.**
 
 ### 1. individuality-core
