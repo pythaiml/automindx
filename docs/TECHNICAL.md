@@ -3,7 +3,7 @@
 automindx (codename **codephreak**) is Professor Codephreak's local-language-model
 environment. This document describes how the pieces fit together and which
 entrypoint to use. For the audit that produced the current code see
-[AUDIT.md](AUDIT.md); for the project narrative see [README.md](README.md).
+[AUDIT.md](AUDIT.md); for the project narrative see [README.md](../README.md).
 
 ## 1. Two ways to run
 

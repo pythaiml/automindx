@@ -56,7 +56,7 @@ have far larger contexts (8k–128k+):
 | `deepseek-r1` | 64k+ |
 | `gpt-oss:120b-cloud` | large (cloud) |
 
-The **[Codephreak AI SDK console](CODEPHREAK_CONSOLE.md)** and
+The **[Codephreak AI SDK console](../docs/CODEPHREAK_CONSOLE.md)** and
 `ollama_codephreak.py` use these models, and the console exposes **`num_ctx`**
 (512–32,768) as a live Scientific setting — so you simply size the window to the
 model. For most work, **move to a modern model** and set `num_ctx` appropriately;

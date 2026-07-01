@@ -5,10 +5,14 @@
 # This needs transformers + torch and several GB of RAM, and the UI does not
 # appear until the model finishes loading. For an entrypoint that loads instantly
 # on modest hardware, use ollama_codephreak.py instead.
+import os
+import sys
 import gradio as gr
 from automind import format_to_llama_chat_style, DEFAULT_SYSTEM_PROMPT
 from memory import save_conversation_memory
 from llama_model import LlamaModel
+# The 4096 context tooling lives in the 4096/ folder (grouped with its docs).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "4096"))
 from context4096 import ContextWindow
 
 MODEL_ID = "microsoft/phi-2"

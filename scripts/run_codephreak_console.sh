@@ -5,7 +5,7 @@
 #
 # Ollama must be running (`ollama serve`); gpt-oss:120b-cloud is the default model.
 set -e
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # repo root (this script lives in scripts/)
 
 echo "▸ Starting self-improving engine (codephreak.py) on :5001 …"
 python3 codephreak.py >/tmp/codephreak_engine.log 2>&1 &

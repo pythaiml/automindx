@@ -6,7 +6,7 @@ the AI SDK makes effortless, and drives Professor Codephreak (and a family of
 sibling personas) with a self-improving feedback loop.
 
 ```bash
-./run_codephreak_console.sh      # engine :5001 + console :3100
+./scripts/run_codephreak_console.sh      # engine :5001 + console :3100
 # open http://localhost:3100   (needs: ollama serve)
 ```
 
