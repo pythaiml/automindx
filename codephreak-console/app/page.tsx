@@ -332,8 +332,10 @@ export default function Console() {
                             <span className="act">
                               {m.role === 'assistant' && body && (
                                 <>
+                                  <span className="react" title="loved it" onClick={() => feedback(m, 'up')} style={{ opacity: fb[m.id] === 'up' ? 1 : 0.4 }}>{fb[m.id] === 'up' ? '❤️' : '🤍'}</span>
                                   <button className="btn ghost sm icon" title="helpful — teaches codephreak.py" onClick={() => feedback(m, 'up')} style={fb[m.id] === 'up' ? { color: 'var(--good)' } : undefined}>▲</button>
                                   <button className="btn ghost sm icon" title="not helpful — teaches codephreak.py" onClick={() => feedback(m, 'down')} style={fb[m.id] === 'down' ? { color: 'var(--bad)' } : undefined}>▼</button>
+                                  <span className="react" title="not for me" onClick={() => feedback(m, 'down')} style={{ opacity: fb[m.id] === 'down' ? 1 : 0.4 }}>💔</span>
                                 </>
                               )}
                               <button className="btn ghost sm icon" title="copy" onClick={() => copy(body, m.id)}>{copied === m.id ? '✓' : '⧉'}</button>
