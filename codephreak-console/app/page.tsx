@@ -1,7 +1,7 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { BUILTIN_PERSONAS, CODEPHREAK_PERSONA, PERSONA_TEMPLATES, composePersonaPrompt, type Persona } from '@/lib/persona';
@@ -298,11 +298,30 @@ export default function Console() {
   }, [busy]);
   const genElapsed = busy && genStart.current ? ((Date.now() - genStart.current) / 1000).toFixed(1) : null;
 
-  const SUGGEST = [
-    'Write a production-ready Python rate limiter with tests.',
-    'Explain the BDI agent model, step by step.',
-    'Design a secure JWT auth flow — modular and concise.',
-  ];
+  // Opening questions evolve: memory-derived (built sAGI modules, recent chats)
+  // takes priority, filling the rest from a shuffled random pool — so they drift
+  // from random toward relevant as memory accumulates. Persona-aware.
+  const SUGGEST = useMemo(() => {
+    const isSagi = sagi || activePersona === 'savante' || activePersona === 'sagi';
+    const pool = isSagi
+      ? ['What module should sAGI build next?', 'Extend the module-registry kernel with a health check.',
+         'Design an agnostic memory adapter for sAGI.', 'Propose a self-healing check for the build loop.',
+         'How should sAGI persist identity across hosts?', 'What is the smallest next step toward the goal?']
+      : ['Write a production-ready Python rate limiter with tests.', 'Design a secure JWT auth flow — modular and concise.',
+         'Explain the BDI agent model, step by step.', 'Audit this repo for the top security risks.',
+         'Refactor a callback pyramid into async/await.', 'Design an idempotent job queue with backpressure.'];
+    const relevant: string[] = [];
+    const mods = sagiDisk.modules || [];
+    if (isSagi && mods.length) {
+      relevant.push(`Continue sAGI from “${mods[mods.length - 1].title}”.`);
+      if (mods.length > 1) relevant.push(`Audit the “${mods[mods.length - 1].title}” module and harden it.`);
+    }
+    const recent = sessions.find((s) => s.title && s.title !== 'Conversation');
+    if (recent) relevant.push(`Continue: ${recent.title}`);
+    const rnd = [...pool].sort(() => Math.random() - 0.5);
+    return Array.from(new Set([...relevant, ...rnd])).slice(0, 3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sagi, activePersona, sagiDisk.count, sessions.length]);
 
   const sub = PERSONA_SUBSTRATE[sagi ? 'savante' : activePersona] || PERSONA_SUBSTRATE.codephreak;
   return (
