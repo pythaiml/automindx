@@ -1,5 +1,6 @@
 /* Professor Codephreak console — elegant, professional, with real 3D depth:
-   layered elevation shadows, glassmorphism, beveled highlights, and lift. */
+   layered elevation shadows, glassmorphism, beveled highlights, and lift.
+   The 3D immersion layer (x/y/z transforms, perspective, z-index) is at the end. */
 :root {
   --bg-0: #070b12;
   --bg-1: #0b1220;
@@ -265,3 +266,49 @@ h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -.01em; }
   font-size: 12px; font-weight: 700; color: #06140e; background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 75%, #fff), var(--accent)); box-shadow: var(--e1); }
 .sagibody { padding: 4px 16px 12px; font-size: 12.7px; color: var(--dim); }
 .sagibody pre { background: #060a11; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   3D IMMERSION LAYER — x / y / z depth, perspective, and z-index stacking.
+   Everything above stays flat-safe; this adds spatial depth on top.
+   ══════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: no-preference) {
+  .content { perspective: 1600px; perspective-origin: 50% 22%; }
+  .view.active { transform-style: preserve-3d; }
+
+  /* Cards float in Z and tilt slightly toward the viewer on hover. */
+  .card {
+    transform: translate3d(0, 0, 0) rotateX(0deg);
+    transition: transform .28s cubic-bezier(.2, .7, .2, 1), box-shadow .28s;
+    will-change: transform;
+  }
+  .card:hover {
+    transform: translate3d(0, -2px, 34px) rotateX(1.6deg);
+    box-shadow: var(--e4), var(--bevel);
+    z-index: 4;
+  }
+
+  /* Chat: bubbles rise; the avatar floats a layer above its bubble (y+z). */
+  .msg { transition: transform .22s ease; transform: translateZ(0); }
+  .msg:hover { transform: translate3d(0, -1px, 14px); }
+  .msg .av { transition: transform .22s ease; }
+  .msg:hover .av { transform: translate3d(0, -3px, 26px) rotateY(-6deg); }
+
+  /* Nav items press toward the viewer; active item sits proud. */
+  .nav button { transition: background .16s, transform .16s, color .16s; }
+  .nav button:hover { transform: translate3d(3px, 0, 12px); }
+  .nav button.active { transform: translateZ(8px); }
+
+  /* sAGI modules stack in depth as they build. */
+  .sagimod { transition: transform .22s, box-shadow .22s; }
+  .sagimod:hover { transform: translate3d(0, -2px, 22px) rotateX(1.1deg); z-index: 3; }
+
+  /* Sliders/chips gain a touch of lift. */
+  .chip:hover { transform: translate3d(0, -1px, 10px); }
+  .list li:hover { transform: translate3d(0, -2px, 12px); }
+}
+
+/* z-index stacking context so raised chrome always sits above lifted cards. */
+.side { position: relative; z-index: 30; }
+.topbar { position: sticky; top: 0; z-index: 25; }
+.savebar { z-index: 8; }
+.msg .av { position: relative; z-index: 2; }

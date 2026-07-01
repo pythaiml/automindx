@@ -227,24 +227,28 @@ export default function Console() {
     return text.trim() || '[empty]';
   }
 
-  async function sagiBuildStep(operatorInput?: string) {
-    const built = sagiLog.map((s) => s.title).join('; ');
+  // priorTitles is passed explicitly so the autonomous loop accumulates context
+  // across steps (React state is stale inside a running async loop). Returns the
+  // new module's title so the loop can extend its running list.
+  async function sagiBuildStep(operatorInput?: string, priorTitles?: string): Promise<string> {
+    const built = priorTitles ?? sagiLog.map((s) => s.title).join('; ');
     const base = `You are building sAGI — a self-building, agnostic, modular scientific general intelligence — one module per step. Modules built so far: ${built || '(none)'}.`;
     const ask = operatorInput
       ? `${base}\nThe operator directs this step: "${operatorInput}". Specify this module: a short Title line, then a concise spec (purpose · interface · how it plugs into an agnostic core · how it advances self-building).`
-      : `${base}\nPropose and specify the NEXT single module: a short Title line, then a concise spec (purpose · interface · how it plugs into an agnostic core · how it advances self-building). Keep it modular and includable in any project (including as a Tauri app).`;
+      : `${base}\nPropose and specify the NEXT single module (do not repeat a module already built): a short Title line, then a concise spec (purpose · interface · how it plugs into an agnostic core · how it advances self-building). Keep it modular and includable in any project (including as a Tauri app).`;
     const text = await collectChat(SAVANTE_PROMPT + SAGI_DIRECTIVE, ask);
     const title = (text.split('\n').find((l) => l.trim()) || 'Module').replace(/^#+\s*|^\*+|^Title:\s*/i, '').replace(/\*+$/, '').slice(0, 90);
     setSagiLog((l) => [...l, { step: l.length + 1, title, body: text }]);
+    return title;
   }
 
   async function runSagiLoop() {
     if (sagiRunning) return;
     setSagiRunning(true); sagiStop.current = false;
-    let n = sagiLog.length;
-    while (!sagiStop.current && autonomousRef.current && sagiRef.current && n < SAGI_MAX_STEPS) {
-      await sagiBuildStep();
-      n++;
+    const titles = sagiLog.map((s) => s.title); // accumulates so each step sees prior modules
+    while (!sagiStop.current && autonomousRef.current && sagiRef.current && titles.length < SAGI_MAX_STEPS) {
+      const t = await sagiBuildStep(undefined, titles.join('; '));
+      titles.push(t);
       await new Promise((r) => setTimeout(r, 600));
     }
     setSagiRunning(false);

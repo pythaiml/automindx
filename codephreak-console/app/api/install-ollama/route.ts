@@ -15,7 +15,13 @@ async function ollamaUp(): Promise<boolean> {
   }
 }
 
+const INSTALL_TIMEOUT_MS = 5 * 60_000; // hard cap; kill a hung installer
+
 export async function POST(req: Request) {
+  // Opt-out for shared/hardened deployments — this endpoint runs a shell command.
+  if (process.env.CODEPHREAK_DISABLE_INSTALL === '1') {
+    return Response.json({ error: 'install endpoint disabled (CODEPHREAK_DISABLE_INSTALL=1)' }, { status: 403 });
+  }
   const { confirm } = await req.json().catch(() => ({}));
   if (confirm !== 'install-ollama') {
     return Response.json({ error: 'confirmation required' }, { status: 400 });
@@ -30,24 +36,27 @@ export async function POST(req: Request) {
       note: 'On Windows, download the installer from https://ollama.com/download',
     });
   }
-  // Run the official install script and capture output.
+  // Run the OFFICIAL install script only, capped output, killed on timeout.
   return await new Promise<Response>((resolve) => {
     const child = spawn('sh', ['-c', 'curl -fsSL https://ollama.com/install.sh | sh'], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let out = '';
-    child.stdout.on('data', (d) => (out += d.toString()));
-    child.stderr.on('data', (d) => (out += d.toString()));
+    const cap = (d: Buffer) => { if (out.length < 64_000) out += d.toString(); };
+    child.stdout.on('data', cap);
+    child.stderr.on('data', cap);
+    const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch {} }, INSTALL_TIMEOUT_MS);
     child.on('close', (code) => {
+      clearTimeout(timer);
       resolve(Response.json({
         ok: code === 0,
         code,
         log: out.slice(-2000),
         note: code === 0
           ? 'Ollama installed. Start it with `ollama serve`, then reload.'
-          : 'Install failed — see log, or install manually from https://ollama.com/download',
+          : 'Install failed or timed out — see log, or install manually from https://ollama.com/download',
       }));
     });
-    child.on('error', (e) => resolve(Response.json({ ok: false, error: String(e) }, { status: 500 })));
+    child.on('error', (e) => { clearTimeout(timer); resolve(Response.json({ ok: false, error: String(e) }, { status: 500 })); });
   });
 }
