@@ -78,6 +78,7 @@ const metaOf = (m: any): Meta => (m?.metadata as Meta) || {};
 export default function Console() {
   const [tab, setTab] = useState('chat');
   const [models, setModels] = useState<Models | null>(null);
+  const [access, setAccess] = useState<Record<string, { accessible: boolean; reason: string; detail?: string }>>({});
   const [model, setModel] = useState(DEFAULT_MODEL);
   const [think, setThink] = useState(true);
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
@@ -153,12 +154,24 @@ export default function Console() {
   useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, status]);
   useEffect(() => { if (status === 'ready' && messages.length) saveSession(messages); /* eslint-disable-next-line */ }, [status]);
   useEffect(() => { if (tab === 'sagi') loadSagiDisk(); /* eslint-disable-next-line */ }, [tab]);
+  useEffect(() => { if (isCloud(model) && !access[model]) probeAccess([model]); /* eslint-disable-next-line */ }, [model, models]);
 
   async function loadModels() {
     try { const r = await fetch('/api/models'); const j: Models = await r.json(); setModels(j);
       if (j.ok && ![...j.local, ...j.cloud].some((m) => m.name === model) && [...j.local, ...j.cloud].some((m) => m.name === DEFAULT_MODEL)) setModel(DEFAULT_MODEL);
+      if (j.ok && j.cloud.length) probeAccess(j.cloud.filter((m) => (m as any).pulled !== false).map((m) => m.name));
     } catch { setModels({ ok: false, local: [], cloud: [], error: 'offline' }); }
   }
+
+  // Account-aware: ask whether the signed-in Ollama account can run each cloud
+  // model (server-cached probe). Verdicts drive the badges below, not a static list.
+  async function probeAccess(names: string[]) {
+    const list = names.filter(Boolean);
+    if (!list.length) return;
+    try { const j = await (await fetch('/api/access', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ models: list }) })).json();
+      if (j.ok) setAccess((a) => ({ ...a, ...j.results })); } catch {}
+  }
+  const cloudSignedIn = Object.values(access).some((v) => v.accessible);
 
   // build the Ollama options object from current settings (blanks dropped server-side)
   function buildOptions(): Record<string, unknown> {
@@ -413,7 +426,9 @@ export default function Console() {
             {models?.cloud.filter((m) => !m.free).length ? <optgroup label="cloud · subscription">{models.cloud.filter((m) => !m.free).map((m) => <option key={m.name} value={m.name}>☁ {m.name}{m.param_size ? ` · ${m.param_size}` : ''}</option>)}</optgroup> : null}
             {!models || (!models.local.length && !models.cloud.length) ? <option value={model}>{model}</option> : null}
           </select>
-          <span className={'tag ' + (isCloud(model) ? 'cloud' : 'local')}>{models?.cloud.find((m) => m.name === model)?.free ? 'free cloud' : isCloud(model) ? 'cloud' : 'local'}</span>
+          <span className={'tag ' + (isCloud(model) ? 'cloud' : 'local')} title={access[model]?.reason}>
+            {isCloud(model) ? (access[model] ? (access[model].accessible ? 'cloud ✓' : access[model].reason === 'subscription' ? 'cloud 🔒' : 'cloud ✗') : 'cloud') : 'local'}
+          </span>
           <div className="spacer" />
           <div className={'toggle' + (think ? ' on' : '')} onClick={() => setThink((v) => !v)} title="Show the model's reasoning stream"><span className="switch" /><span className="small">reasoning</span></div>
           <span className="pill" title="tokens this conversation">🪙 {sessionTokens.toLocaleString()}</span>
@@ -668,20 +683,40 @@ export default function Console() {
                   <div className="small dim" id="installlog" style={{ marginTop: 8 }}>{installMsg}</div>
                 </div>
               )}
-              <div className="hint" style={{ marginTop: live ? 0 : 12 }}>One-click pull to install a model on this host. 🆓 = free tier (no subscription).</div>
+              {live && (
+                <div className="notice" style={{ marginTop: 12 }}>
+                  <b>Ollama Cloud</b> — {cloudSignedIn ? '✓ signed in (cloud models accessible).' : 'sign in to unlock subscription cloud models.'}
+                  <div className="row" style={{ marginTop: 8 }}>
+                    <span className="mono small">ollama signin</span>
+                    <a className="btn ghost sm" href="https://ollama.com/signin" target="_blank" rel="noreferrer">ollama.com/signin ↗</a>
+                    <button className="btn ghost sm" onClick={() => probeAccess((models?.cloud || []).filter((m) => (m as any).pulled !== false).map((m) => m.name))}>↻ re-check access</button>
+                  </div>
+                </div>
+              )}
+              <div className="hint" style={{ marginTop: 12 }}>One-click pull to install a model on this host. Cloud access is checked against your signed-in account.</div>
               <ul className="list">
-                {[...(models?.cloud || []), ...(models?.local || [])].map((m) => (
+                {[...(models?.cloud || []), ...(models?.local || [])].map((m) => {
+                  const cloud = isCloud(m.name); const acc = access[m.name];
+                  return (
                   <li key={m.name}>
                     <div className="meta">
-                      <div className="ttl">{m.free ? '🆓 ' : (isCloud(m.name) ? '☁ ' : '▣ ')}<span className="mono">{m.name}</span>{m.param_size ? <span className="dim small"> · {m.param_size}</span> : null}</div>
+                      <div className="ttl">{cloud ? '☁ ' : '▣ '}<span className="mono">{m.name}</span>{m.param_size ? <span className="dim small"> · {m.param_size}</span> : null}</div>
                       {pulling[m.name] && <div className="sub">{pulling[m.name]}</div>}
                     </div>
                     {(m as any).pulled === false
                       ? <button className="btn sm" disabled={!!pulling[m.name]} onClick={() => pull(m.name)}>{pulling[m.name] ? '…' : '⤓ pull'}</button>
-                      : <span className="badge on">✓ installed</span>}
+                      : cloud
+                        ? (acc
+                            ? (acc.accessible
+                                ? <span className="badge on">✓ available</span>
+                                : acc.reason === 'subscription'
+                                  ? <a className="badge" style={{ color: 'var(--gold)', borderColor: '#4a3a1d' }} href="https://ollama.com/signin" target="_blank" rel="noreferrer">🔒 subscription</a>
+                                  : <span className="badge" style={{ color: 'var(--bad)' }}>✗ {acc.reason}</span>)
+                            : <span className="badge">checking…</span>)
+                        : <span className="badge on">✓ installed</span>}
                     <button className="btn ghost sm" onClick={() => setModel(m.name)}>use →</button>
                   </li>
-                ))}
+                ); })}
               </ul>
             </div>
 
