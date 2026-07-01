@@ -192,9 +192,10 @@ python3 uiux.py \
 - **[Professor Codephreak](https://github.com/Professor-Codephreak)** — the origin and the evolving author; also runs the team of OpenAI agents at **[gpt.pythai.net](https://gpt.pythai.net)**
 - **[github.com/GATERAGE](https://github.com/GATERAGE)** — the organization
   - **[GATERAGE/aglm](https://github.com/GATERAGE/aglm)** — Autonomous General Learning Model (package + consoles)
-  - **[GATERAGE/RAGE](https://github.com/GATERAGE/RAGE)** — retrieval substrate (memory)
+  - **[GATERAGE/RAGE](https://github.com/GATERAGE/RAGE)** — retrieval substrate (memory); sAGI **[saves its memory trees](docs/savethetrees.md)** here (pgvectorscale · [rage.pythai.net](https://rage.pythai.net))
   - **[GATERAGE/mastermind](https://github.com/GATERAGE/mastermind)** — strategic orchestrator; **[mastermind.pythai.net](https://mastermind.pythai.net)** is the warcouncil interaction to the boardroom
 - **[github.com/aiterm](https://github.com/aiterm)** — *augmented intelligence terminal*, the terminal-AI arm of the PYTHAI / Professor Codephreak ecosystem ([pythai.net](https://pythai.net)): a curated hub of terminal-first AI/CLI tooling on the thesis that the terminal is the primary interface for AI-augmented development. automindX embodies this directly — the console's **⌘ Terminal** lets you call Claude from your subscription CLI and work on the dapp from inside the dapp.
+- **[Professor-Codephreak/gitmind](https://github.com/Professor-Codephreak/gitmind)** — the git-like memory that sAGI's in-runtime **gitmind** ports (local/global commit tiers; trees embedded into RAGE — see **[docs/savethetrees.md](docs/savethetrees.md)**)
 - Original codephreak (historical) — <https://github.com/Professor-Codephreak/automind>
 - **mindX** — the production system aGLM was distilled from · docs: **[mindx.pythai.net/docs.html](https://mindx.pythai.net/docs.html)**
 - **[rage.pythai.net](https://rage.pythai.net)** — the public broadcast layer ("public noise"), where mindX publishes in the voice of mindX via its **AuthorAgent**; Professor Codephreak has published there occasionally

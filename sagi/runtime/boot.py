@@ -12,15 +12,24 @@ from .gitmind import GitMind
 from .modules import SEED
 
 
-def boot(sagi_dir: str, call_model: Optional[Callable[[str, str], str]] = None) -> Tuple[Host, Dict[str, dict]]:
+def boot(sagi_dir: str, call_model: Optional[Callable[[str, str], str]] = None,
+         rage: bool = False) -> Tuple[Host, Dict[str, dict]]:
     """Activate the three seed modules in ship order and register them in the kernel.
 
     be thyself (1) -> do no harm (2) -> grow thyself (3). Returns the live host and
     the module handles keyed by id. The host also grows a gitmind memory tree that
     snapshots each persisted moment, so memory is reachable from any .history moment.
+    With rage=True, global (expansion / massive-upgrade) commits are also embedded
+    into the RAGE store (pgvectorscale, https://rage.pythai.net).
     """
     host = Host(sagi_dir, call_model=call_model)
     host.memory = GitMind(host.root)          # git-like internal memory tree
+    host.rage = None
+    if rage:
+        from .rage_sync import RageSync
+        host.rage = RageSync(host.memory)
+        host.memory.on_commit = lambda ch, obj: (
+            host.rage.save_commit(ch) if obj.get("scope") == "global" else None)
     host.log("run_start", runtime="sagi.runtime")
     handles: Dict[str, dict] = {}
     for mod in SEED:                          # 1 -> 2 -> 3

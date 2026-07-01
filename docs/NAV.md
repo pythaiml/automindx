@@ -15,6 +15,7 @@ Navigation for all project docs. (Start at the [README](../README.md).)
 ## sAGI
 - [../sagi/POINT_OF_DEPARTURE.md](../sagi/POINT_OF_DEPARTURE.md) — the canonical sAGI point of departure (seed + self-build protocol + individuality)
 - [../sagi/seed/](../sagi/seed/) — the three point-of-departure seed modules (be thyself · do no harm · grow thyself)
+- [savethetrees.md](savethetrees.md) — saving sAGI memory: gitmind tree → RAGE (pgvectorscale), and the workflow
 - [../sagi/README.md](../sagi/README.md) — the agnostic sAGI package
 
 ## Audit & fixes
