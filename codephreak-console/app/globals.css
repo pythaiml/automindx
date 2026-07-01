@@ -251,3 +251,17 @@ h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -.01em; }
 .list li .sub { color: var(--faint); font-size: 11px; font-family: var(--mono); margin-top: 3px; }
 .badge { font-size: 10px; font-family: var(--mono); padding: 2px 7px; border-radius: 5px; border: 1px solid var(--glass-brd); color: var(--dim); box-shadow: var(--bevel); }
 .badge.on { color: var(--accent); border-color: rgba(46,230,166,.4); }
+.togrow { display: flex; gap: 14px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.togrow:first-of-type { border-top: 0; }
+.togrow .toggle b { color: var(--ink); }
+.notice { background: linear-gradient(180deg, rgba(20,40,52,.6), rgba(14,28,38,.6)); border: 1px solid #1d3a44;
+  border-radius: 12px; padding: 11px 14px; color: #a9e6dc; font-size: 12.5px; box-shadow: var(--bevel); }
+.sagilog { display: flex; flex-direction: column; gap: 12px; }
+.sagimod { border: 1px solid var(--glass-brd); border-radius: 14px; background: linear-gradient(180deg, rgba(18,27,42,.7), rgba(12,19,30,.7));
+  box-shadow: var(--e2), var(--bevel); overflow: hidden; }
+.sagihead { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--line);
+  background: linear-gradient(90deg, rgba(46,230,166,.08), transparent); }
+.sagistep { width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; font-family: var(--mono);
+  font-size: 12px; font-weight: 700; color: #06140e; background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 75%, #fff), var(--accent)); box-shadow: var(--e1); }
+.sagibody { padding: 4px 16px 12px; font-size: 12.7px; color: var(--dim); }
+.sagibody pre { background: #060a11; }

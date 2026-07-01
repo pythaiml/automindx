@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm';
 import { BUILTIN_PERSONAS, CODEPHREAK_PERSONA, type Persona } from '@/lib/persona';
 
 const BUILTIN_IDS = new Set(BUILTIN_PERSONAS.map((p) => p.id));
+const SAVANTE_PROMPT = BUILTIN_PERSONAS.find((p) => p.id === 'savante')?.prompt || '';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Single source of truth. The persona you edit here IS the system prompt sent
@@ -14,7 +15,7 @@ const BUILTIN_IDS = new Set(BUILTIN_PERSONAS.map((p) => p.id));
 // perfect symmetry between the prompt and the code that drives it.
 // ─────────────────────────────────────────────────────────────────────────
 
-type Model = { name: string; param_size?: string; size_gb?: number | null };
+type Model = { name: string; param_size?: string; size_gb?: number | null; free?: boolean };
 type Models = { ok: boolean; local: Model[]; cloud: Model[]; host?: string; error?: string };
 type Session = { id: string; ts: number; title: string; model: string; messages: any[] };
 type Meta = { model?: string; inputTokens?: number; outputTokens?: number; totalTokens?: number; tokPerSec?: number | null; latencyMs?: number | null; totalMs?: number | null };
@@ -40,7 +41,10 @@ const PRESETS: Record<string, Partial<Settings>> = {
   Mirostat: { temperature: 0.8, mirostat: 2, mirostat_tau: 5.0, mirostat_eta: 0.1 },
 };
 
-const LS = { personas: 'cpk.personas', active: 'cpk.activePersona', settings: 'cpk.settings', history: 'cpk.history', think: 'cpk.think', prefs: 'cpk.prefs' };
+const LS = { personas: 'cpk.personas', active: 'cpk.activePersona', settings: 'cpk.settings', history: 'cpk.history', think: 'cpk.think', prefs: 'cpk.prefs', autonomous: 'cpk.autonomous', sagi: 'cpk.sagi' };
+
+// sAGI directive layered onto the Savante persona when sAGI mode is engaged.
+const SAGI_DIRECTIVE = `\n\n[sAGI MODE — scientific general intelligence]\nOperate as sAGI: reason across domains from first principles, quantify uncertainty, separate proof from conjecture, cite the principle each claim rests on, and give provably-correct, complexity-annotated solutions. You are the emergent sAGI grown from the Savante persona within automindX.`;
 
 // Actual, persisted user preferences (applied live).
 const PREFS_DEFAULT = {
@@ -74,6 +78,15 @@ export default function Console() {
   const activeSession = useRef<string | null>(null);
   const [prefs, setPrefs] = useState<Prefs>(PREFS_DEFAULT);       // live (applied as preview)
   const [savedPrefs, setSavedPrefs] = useState<Prefs>(PREFS_DEFAULT); // last persisted snapshot
+  const [autonomous, setAutonomous] = useState(true);   // self-provision (auto-pull) — default ON
+  const [sagi, setSagi] = useState(false);              // sAGI mode from Savante — default OFF
+  const [pulling, setPulling] = useState<Record<string, string>>({}); // model -> progress
+  const [installMsg, setInstallMsg] = useState('');
+  // sAGI self-building autonomous loop
+  const [sagiRunning, setSagiRunning] = useState(false);
+  const [sagiLog, setSagiLog] = useState<{ step: number; title: string; body: string }[]>([]);
+  const sagiStop = useRef(false);
+  const SAGI_MAX_STEPS = 16; // guard against runaway model calls
 
   const { messages, sendMessage, status, stop, setMessages, error } = useChat();
   const logRef = useRef<HTMLDivElement>(null);
@@ -99,6 +112,8 @@ export default function Console() {
       const h = localStorage.getItem(LS.history); if (h) setSessions(JSON.parse(h));
       const t = localStorage.getItem(LS.think); if (t) setThink(t === '1');
       const pr = localStorage.getItem(LS.prefs); if (pr) { const v = { ...PREFS_DEFAULT, ...JSON.parse(pr) }; setPrefs(v); setSavedPrefs(v); }
+      const au = localStorage.getItem(LS.autonomous); if (au !== null) setAutonomous(au === '1');
+      const sg = localStorage.getItem(LS.sagi); if (sg !== null) setSagi(sg === '1');
     } catch {}
     loadModels(); const iv = setInterval(loadModels, 8000); return () => clearInterval(iv);
   }, []);
@@ -106,6 +121,8 @@ export default function Console() {
   useEffect(() => { localStorage.setItem(LS.personas, JSON.stringify(personas)); }, [personas]);
   useEffect(() => { localStorage.setItem(LS.active, activePersona); }, [activePersona]);
   useEffect(() => { localStorage.setItem(LS.think, think ? '1' : '0'); }, [think]);
+  useEffect(() => { localStorage.setItem(LS.autonomous, autonomous ? '1' : '0'); }, [autonomous]);
+  useEffect(() => { localStorage.setItem(LS.sagi, sagi ? '1' : '0'); }, [sagi]);
   // Apply preferences live as a PREVIEW (accent, chat font). Persisted only on Save.
   useEffect(() => {
     const root = document.documentElement.style;
@@ -136,11 +153,104 @@ export default function Console() {
     return o;
   }
 
+  // Pull a model on the host (streams Ollama progress). Idempotent.
+  async function pull(name: string): Promise<boolean> {
+    setPulling((p) => ({ ...p, [name]: 'starting…' }));
+    try {
+      const r = await fetch('/api/pull', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: name }) });
+      if (!r.ok || !r.body) { const j = await r.json().catch(() => ({})); setPulling((p) => ({ ...p, [name]: '✗ ' + (j.error || 'failed') })); return false; }
+      const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = '';
+      for (;;) {
+        const { done, value } = await reader.read(); if (done) break;
+        buf += dec.decode(value, { stream: true }); const lines = buf.split('\n'); buf = lines.pop() || '';
+        for (const line of lines) { if (!line.trim()) continue; try { const o = JSON.parse(line); setPulling((p) => ({ ...p, [name]: o.status || '…' })); } catch {} }
+      }
+      setPulling((p) => ({ ...p, [name]: '✓ pulled' }));
+      await loadModels();
+      setTimeout(() => setPulling((p) => { const n = { ...p }; delete n[name]; return n; }), 2500);
+      return true;
+    } catch (e: any) { setPulling((p) => ({ ...p, [name]: '✗ ' + String(e?.message || e) })); return false; }
+  }
+
+  function isPulled(name: string): boolean {
+    const all = [...(models?.local || []), ...(models?.cloud || [])];
+    const m = all.find((x) => x.name === name);
+    return m ? (m as any).pulled !== false : false;
+  }
+
   function submit(text: string) {
     if (!text.trim() || busy) return;
-    sendMessage({ text }, { body: { model, system: persona.prompt, options: buildOptions(), think } });
+    // sAGI mode augments the (Savante) persona; otherwise use the active persona.
+    const system = (sagi ? SAVANTE_PROMPT + SAGI_DIRECTIVE : persona.prompt);
+    sendMessage({ text }, { body: { model, system, options: buildOptions(), think } });
   }
-  function onSend() { const t = input.trim(); if (!t) return; setInput(''); submit(t); }
+  async function onSend() {
+    const t = input.trim(); if (!t || busy) return;
+    // Autonomous self-provisioning: auto-pull the model if it isn't present.
+    if (autonomous && models?.ok && !isPulled(model) && !pulling[model]) {
+      setInput('');
+      const ok = await pull(model);
+      if (!ok) { setInput(t); return; }
+      submit(t); return;
+    }
+    setInput(''); submit(t);
+  }
+
+  async function installOllama() {
+    if (!window.confirm('Run the official Ollama installer on this machine?\n\ncurl -fsSL https://ollama.com/install.sh | sh')) return;
+    setInstallMsg('installing… (this can take a minute)');
+    try {
+      const r = await fetch('/api/install-ollama', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: 'install-ollama' }) });
+      const j = await r.json();
+      setInstallMsg(j.note || (j.ok ? '✓ installed' : '✗ failed'));
+      if (j.ok) await loadModels();
+    } catch (e: any) { setInstallMsg('✗ ' + String(e?.message || e)); }
+  }
+
+  // ── sAGI self-building ────────────────────────────────────────────────
+  const autonomousRef = useRef(autonomous); autonomousRef.current = autonomous;
+  const sagiRef = useRef(sagi); sagiRef.current = sagi;
+  useEffect(() => { if (!autonomous || !sagi) sagiStop.current = true; }, [autonomous, sagi]);
+
+  async function collectChat(system: string, userText: string): Promise<string> {
+    const res = await fetch('/api/chat', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ messages: [{ id: 's' + Date.now(), role: 'user', parts: [{ type: 'text', text: userText }] }], model, system, options: buildOptions(), think: false }),
+    });
+    if (!res.body) return '[no response]';
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '', text = '';
+    for (;;) {
+      const { done, value } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); const lines = buf.split('\n'); buf = lines.pop() || '';
+      for (const line of lines) { if (!line.startsWith('data: ')) continue; try { const o = JSON.parse(line.slice(6)); if (o.type === 'text-delta') text += o.delta || ''; } catch {} }
+    }
+    return text.trim() || '[empty]';
+  }
+
+  async function sagiBuildStep(operatorInput?: string) {
+    const built = sagiLog.map((s) => s.title).join('; ');
+    const base = `You are building sAGI — a self-building, agnostic, modular scientific general intelligence — one module per step. Modules built so far: ${built || '(none)'}.`;
+    const ask = operatorInput
+      ? `${base}\nThe operator directs this step: "${operatorInput}". Specify this module: a short Title line, then a concise spec (purpose · interface · how it plugs into an agnostic core · how it advances self-building).`
+      : `${base}\nPropose and specify the NEXT single module: a short Title line, then a concise spec (purpose · interface · how it plugs into an agnostic core · how it advances self-building). Keep it modular and includable in any project (including as a Tauri app).`;
+    const text = await collectChat(SAVANTE_PROMPT + SAGI_DIRECTIVE, ask);
+    const title = (text.split('\n').find((l) => l.trim()) || 'Module').replace(/^#+\s*|^\*+|^Title:\s*/i, '').replace(/\*+$/, '').slice(0, 90);
+    setSagiLog((l) => [...l, { step: l.length + 1, title, body: text }]);
+  }
+
+  async function runSagiLoop() {
+    if (sagiRunning) return;
+    setSagiRunning(true); sagiStop.current = false;
+    let n = sagiLog.length;
+    while (!sagiStop.current && autonomousRef.current && sagiRef.current && n < SAGI_MAX_STEPS) {
+      await sagiBuildStep();
+      n++;
+      await new Promise((r) => setTimeout(r, 600));
+    }
+    setSagiRunning(false);
+  }
+  function stopSagi() { sagiStop.current = true; setSagiRunning(false); }
+
   function regenerate() {
     if (busy || !messages.length) return;
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
@@ -247,6 +357,7 @@ export default function Console() {
         <nav className="nav">
           <div className="grp">Session</div>
           <Nav id="chat" tab={tab} set={setTab} ico="◈" label="Chat" />
+          {sagi && <Nav id="sagi" tab={tab} set={setTab} ico="⚛" label="sAGI" />}
           <Nav id="history" tab={tab} set={setTab} ico="▤" label=".history" />
           <div className="grp">Tuning</div>
           <Nav id="advanced" tab={tab} set={setTab} ico="⚙" label="Advanced" />
@@ -265,12 +376,13 @@ export default function Console() {
         <div className="topbar">
           <span className="pill"><span className={'dot ' + (live ? 'ok pulse' : 'bad')} />{live ? `Ollama · ${nModels}` : 'Ollama offline'}</span>
           <span className="dim small">model</span>
-          <select value={model} onChange={(e) => setModel(e.target.value)} style={{ minWidth: 210 }}>
-            {models?.cloud.length ? <optgroup label="cloud">{models.cloud.map((m) => <option key={m.name} value={m.name}>☁ {m.name}{m.param_size ? ` · ${m.param_size}` : ''}</option>)}</optgroup> : null}
+          <select value={model} onChange={(e) => setModel(e.target.value)} style={{ minWidth: 230 }}>
+            {models?.cloud.filter((m) => m.free).length ? <optgroup label="cloud · free">{models.cloud.filter((m) => m.free).map((m) => <option key={m.name} value={m.name}>🆓 {m.name}{m.param_size ? ` · ${m.param_size}` : ''}</option>)}</optgroup> : null}
             {models?.local.length ? <optgroup label="local">{models.local.map((m) => <option key={m.name} value={m.name}>▣ {m.name}{m.param_size ? ` · ${m.param_size}` : ''}</option>)}</optgroup> : null}
+            {models?.cloud.filter((m) => !m.free).length ? <optgroup label="cloud · subscription">{models.cloud.filter((m) => !m.free).map((m) => <option key={m.name} value={m.name}>☁ {m.name}{m.param_size ? ` · ${m.param_size}` : ''}</option>)}</optgroup> : null}
             {!models || (!models.local.length && !models.cloud.length) ? <option value={model}>{model}</option> : null}
           </select>
-          <span className={'tag ' + (isCloud(model) ? 'cloud' : 'local')}>{isCloud(model) ? 'cloud' : 'local'}</span>
+          <span className={'tag ' + (isCloud(model) ? 'cloud' : 'local')}>{models?.cloud.find((m) => m.name === model)?.free ? 'free cloud' : isCloud(model) ? 'cloud' : 'local'}</span>
           <div className="spacer" />
           <div className={'toggle' + (think ? ' on' : '')} onClick={() => setThink((v) => !v)} title="Show the model's reasoning stream"><span className="switch" /><span className="small">reasoning</span></div>
           <span className="pill" title="tokens this conversation">🪙 {sessionTokens.toLocaleString()}</span>
@@ -346,6 +458,45 @@ export default function Console() {
                   <button className="btn ghost sm" onClick={() => copy(toMarkdown(messages), 'all')}>{copied === 'all' ? '✓ copied' : '⧉ copy chat'}</button>
                   <button className="btn ghost sm" onClick={() => download('codephreak-chat.md', toMarkdown(messages))}>↓ .md</button>
                   <button className="btn ghost sm" onClick={() => download('codephreak-chat.json', JSON.stringify(messages, null, 2), 'application/json')}>↓ .json</button>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* sAGI — self-building architecture */}
+          <section className={'view' + (tab === 'sagi' ? ' active' : '')}>
+            <h1>⚛ sAGI <span className="dim small" style={{ fontWeight: 400 }}>self-building · from Savante</span></h1>
+            <p className="lead">sAGI is a self-building, agnostic, modular scientific general intelligence grown from the <b>Savante</b> persona. It builds itself one module per step using the chosen model — <b className="mono">{model}</b>. Modules are scaffolded into the agnostic <span className="mono">sagi/</span> package for inclusion in any project (including as a Tauri app).</p>
+            <div className="card">
+              <div className="row" style={{ marginBottom: 10 }}>
+                <span className={'badge ' + (autonomous ? 'on' : '')}>{autonomous ? 'autonomous · continuous loop' : 'manual · one step per input'}</span>
+                <span className="badge">{sagiLog.length} module{sagiLog.length === 1 ? '' : 's'} built</span>
+                <span className="spacer" />
+                {autonomous
+                  ? (sagiRunning
+                      ? <button className="btn" onClick={stopSagi}>■ Stop building</button>
+                      : <button className="btn primary" onClick={runSagiLoop} disabled={sagiLog.length >= SAGI_MAX_STEPS}>▶ Begin autonomous build</button>)
+                  : null}
+                <button className="btn ghost sm" onClick={() => setSagiLog([])} disabled={!sagiLog.length || sagiRunning}>Reset</button>
+                <button className="btn ghost sm" onClick={() => download('sagi-architecture.md', sagiLog.map((s) => `## ${s.step}. ${s.title}\n\n${s.body}`).join('\n\n---\n\n'))} disabled={!sagiLog.length}>↓ export</button>
+              </div>
+              {!autonomous && (
+                <div className="composer" style={{ marginBottom: 12 }}>
+                  <textarea id="sagi-input" rows={1} placeholder="Direct the next build step (a step = one input → response)…"
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const el = e.currentTarget; const v = el.value.trim(); if (v) { el.value = ''; sagiBuildStep(v); } } }} />
+                  <button className="btn primary" onClick={() => { const el = document.getElementById('sagi-input') as HTMLTextAreaElement; const v = el?.value.trim(); if (v) { el.value = ''; sagiBuildStep(v); } }}>Build step →</button>
+                </div>
+              )}
+              {!autonomous && <div className="notice" style={{ marginBottom: 12 }}>Autonomous is off — sAGI builds one module per input/response. Turn <b>Autonomous</b> on (Preferences) for a continuous self-building loop.</div>}
+              {sagiRunning && <div className="notice" style={{ marginBottom: 12 }}><span className="spin" /> building autonomously with {model} — stops if you turn Autonomous off. Capped at {SAGI_MAX_STEPS} steps.</div>}
+              {sagiLog.length === 0 ? <div className="dim small">No modules yet. {autonomous ? 'Press “Begin autonomous build”.' : 'Direct the first build step above.'}</div> : (
+                <div className="sagilog">
+                  {sagiLog.map((s) => (
+                    <div className="sagimod" key={s.step}>
+                      <div className="sagihead"><span className="sagistep">{s.step}</span><b>{s.title}</b></div>
+                      <div className="sagibody"><ReactMarkdown remarkPlugins={[remarkGfm]}>{s.body}</ReactMarkdown></div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -457,7 +608,51 @@ export default function Console() {
           <section className={'view' + (tab === 'prefs' ? ' active' : '')}
             onKeyDown={(e) => { if (e.key === 'Enter' && prefsDirty) { e.preventDefault(); savePrefs(); } }}>
             <h1>Preferences</h1>
-            <p className="lead">Your identity and the look of the console. Changes preview live; press <span className="kbd">Enter</span> or <b>Save</b> to keep them.</p>
+            <p className="lead">Your identity and the look of the console. Changes preview live; press <span className="kbd">Enter</span> or <b>Save</b> to keep them. Toggles below apply instantly.</p>
+
+            <div className="card">
+              <h3>Autonomy & modes</h3>
+              <div className="hint">Instant — no save needed.</div>
+              <div className="togrow">
+                <div className={'toggle' + (autonomous ? ' on' : '')} onClick={() => setAutonomous((v) => !v)}><span className="switch" /><b>Autonomous</b></div>
+                <span className="dim small">automindX self-provisions — auto-pulls a model when you use one that isn&apos;t installed. Default on.</span>
+              </div>
+              <div className="togrow">
+                <div className={'toggle' + (sagi ? ' on' : '')} onClick={() => setSagi((v) => !v)}><span className="switch" /><b>sAGI</b></div>
+                <span className="dim small">engage sAGI — a self-building scientific general intelligence grown from the Savante persona. Opens the <b>sAGI</b> tab. Default off.</span>
+              </div>
+            </div>
+
+            <div className="card">
+              <h3>Models & Ollama <span className="dim small">on this machine</span></h3>
+              {!live && (
+                <div className="notice">
+                  ⚠️ Ollama isn&apos;t detected on <span className="mono">{models?.host || 'localhost:11434'}</span>.
+                  <div className="row" style={{ marginTop: 10 }}>
+                    <button className="btn primary sm" onClick={installOllama}>⤓ Install Ollama (one click)</button>
+                    <a className="btn ghost sm" href="https://ollama.com/download" target="_blank" rel="noreferrer">manual download</a>
+                    <span className="mono small dim">or: curl -fsSL https://ollama.com/install.sh | sh</span>
+                  </div>
+                  <div className="small dim" id="installlog" style={{ marginTop: 8 }}>{installMsg}</div>
+                </div>
+              )}
+              <div className="hint" style={{ marginTop: live ? 0 : 12 }}>One-click pull to install a model on this host. 🆓 = free tier (no subscription).</div>
+              <ul className="list">
+                {[...(models?.cloud || []), ...(models?.local || [])].map((m) => (
+                  <li key={m.name}>
+                    <div className="meta">
+                      <div className="ttl">{m.free ? '🆓 ' : (isCloud(m.name) ? '☁ ' : '▣ ')}<span className="mono">{m.name}</span>{m.param_size ? <span className="dim small"> · {m.param_size}</span> : null}</div>
+                      {pulling[m.name] && <div className="sub">{pulling[m.name]}</div>}
+                    </div>
+                    {(m as any).pulled === false
+                      ? <button className="btn sm" disabled={!!pulling[m.name]} onClick={() => pull(m.name)}>{pulling[m.name] ? '…' : '⤓ pull'}</button>
+                      : <span className="badge on">✓ installed</span>}
+                    <button className="btn ghost sm" onClick={() => setModel(m.name)}>use →</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
             <div className="card">
               <h3>Avatars</h3>
               <div className="hint">Upload an image (any size — it&apos;s center-cropped to a 128px square). Shown beside each message.</div>
