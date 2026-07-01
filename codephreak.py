@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -66,6 +67,8 @@ class SelfImprovingPersona:
     log: list = field(default_factory=list)
 
     def __post_init__(self):
+        # Guards concurrent record()/directives() — the HTTP engine is threaded.
+        self._lock = threading.Lock()
         self._load()
 
     def _load(self):
@@ -88,11 +91,12 @@ class SelfImprovingPersona:
             "rating": "up" if rating == "up" else "down",
             "prompt": prompt[:2000], "response": response[:8000], "note": note[:500],
         }
-        self.log.append(entry)
-        os.makedirs(os.path.dirname(self.store) or ".", exist_ok=True)
-        with open(self.store, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        return self.directives(persona)
+        with self._lock:
+            self.log.append(entry)
+            os.makedirs(os.path.dirname(self.store) or ".", exist_ok=True)
+            with open(self.store, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            return self.directives(persona)
 
     def directives(self, persona: Optional[str] = None) -> list[str]:
         """Contrast liked vs disliked responses into natural-language directives."""

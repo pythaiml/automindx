@@ -24,3 +24,7 @@ codephreak-console/.next/
 
 # sagi self-build output (runtime)
 sagi/modules/*.md
+
+# service-layer runtime
+memory/*.db
+*.db
