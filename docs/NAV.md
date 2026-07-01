@@ -23,6 +23,7 @@ Navigation for all project docs. (Start at the [README](../README.md).)
 
 ## Ecosystem
 - [github.com/GATERAGE](https://github.com/GATERAGE) · [aglm](https://github.com/GATERAGE/aglm) · [RAGE](https://github.com/GATERAGE/RAGE) · [mastermind](https://github.com/GATERAGE/mastermind)
+- [github.com/aiterm](https://github.com/aiterm) — *augmented intelligence terminal* (terminal-AI arm of the ecosystem, [pythai.net](https://pythai.net)); realized here by the console's ⌘ Terminal
 - [Professor Codephreak](https://github.com/Professor-Codephreak) · [mindx.pythai.net/automindx](https://mindx.pythai.net/automindx) · [rage.pythai.net](https://rage.pythai.net)
 
 ## Layout
