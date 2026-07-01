@@ -116,9 +116,15 @@ export default function Console() {
   useEffect(() => { try { localStorage.setItem('cpk.sagiSteps', String(sagiSteps)); } catch { /* ignore */ } }, [sagiSteps]);
   const [sagiGoal, setSagiGoal] = useState('');
   const shq = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'";   // safe single-quote for the shell
-  const composeSagiPrompt = (goal: string, steps: number) => {
+  // STAGE 1 — /plan only. Claude outputs the plan; we wait for it, then proceed.
+  const composeSagiPlan = (goal: string, steps: number) => {
     const g = goal || 'expand sAGI';
-    return `/plan ultracode — produce an exhaustive, dependency-ordered plan of exactly ${steps} build step${steps === 1 ? '' : 's'} toward the goal, grounded in the existing sagi/ package (one input→response per step, one module scaffolded into sagi/modules/ per step). For each step give: the module path, its purpose, its public API, and which sub-goal it advances; separate proof from conjecture. Do NOT build yet — output only the plan, then stop for approval.\n\n/goal ${g}`;
+    return `/plan produce an exhaustive, dependency-ordered plan of exactly ${steps} build step${steps === 1 ? '' : 's'} toward the goal "${g}", grounded in the existing sagi/ package (one module per step, scaffolded into sagi/modules/). For each step give: the module path, its purpose, its public API, and which sub-goal it advances; separate proof from conjecture. Output ONLY the plan — do not build yet.`;
+  };
+  // STAGE 3 — injected AFTER the plan output finishes: ultracode + /goal to proceed.
+  const composeSagiProceed = (goal: string) => {
+    const g = goal || 'expand sAGI';
+    return `ultracode — proceed with the plan: build the planned modules, one input→response per step, each persisted into sagi/modules/. Verify each step before the next. /goal ${g}`;
   };
   // The dedicated Claude button: start interactive claude, wait, inject the sAGI
   // prompt — regardless of the model selector (this button IS the Claude path).
@@ -128,7 +134,7 @@ export default function Console() {
     if (!ctl) { setSagiNote('Opening the ⌘ Terminal — press the ◆ Claude button again once it connects.'); return; }
     ctl.restore();
     const g = sagiGoal.trim();
-    const r = await ctl.claudeInteractive(composeSagiPrompt(g, sagiSteps), { goal: g });
+    const r = await ctl.claudeInteractive(composeSagiPlan(g, sagiSteps), { proceed: composeSagiProceed(g) });
     if (r === 'login-required') {
       ctl.note('\x1b[38;5;214m⚠ claude is not signed in — complete the browser sign-in (or run /login), then press ◆ Claude again.\x1b[0m');
       setSagiNote('Claude is not signed in — finish the sign-in shown in the terminal, then press ◆ Claude again.');
