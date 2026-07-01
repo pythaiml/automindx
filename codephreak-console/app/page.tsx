@@ -12,6 +12,7 @@ import { useSagi } from '@/hooks/useSagi';
 import Substrate from './Substrate';
 import SagiVisual from './SagiVisual';
 import SagiBackground from './SagiBackground';
+import SagiFace from './SagiFace';
 import dynamic from 'next/dynamic';
 
 // xterm.js is client-only — load the interactive terminal popup without SSR.
@@ -443,6 +444,7 @@ export default function Console() {
             <h1>⚛ sAGI <span className="dim small" style={{ fontWeight: 400 }}>self-building · from Savante</span></h1>
             <p className="lead">sAGI is a self-building, agnostic, modular scientific general intelligence grown from the <b>Savante</b> persona. It builds itself one module per step using the chosen model — <b className="mono">{model}</b>. Modules are scaffolded into the agnostic <span className="mono">sagi/</span> package for inclusion in any project (including as a Tauri app).</p>
             <div className="card">
+              <SagiFace speakText={sagiDisk.modules?.length ? sagiDisk.modules[sagiDisk.modules.length - 1].title : undefined} />
               <SagiVisual modules={sagiDisk.modules || []} building={sagiRunning || sagiGrew} />
               {sagiHistory.length > 0 && (
                 <details className="sagi-history" open>
