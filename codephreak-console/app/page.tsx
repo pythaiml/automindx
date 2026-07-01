@@ -10,6 +10,10 @@ import { usePrefs } from '@/hooks/usePrefs';
 import { useModels } from '@/hooks/useModels';
 import { useSagi } from '@/hooks/useSagi';
 import Substrate from './Substrate';
+import dynamic from 'next/dynamic';
+
+// xterm.js is client-only — load the interactive terminal popup without SSR.
+const ClaudeTerminal = dynamic(() => import('./ClaudeTerminal'), { ssr: false });
 
 const BUILTIN_IDS = new Set(BUILTIN_PERSONAS.map((p) => p.id));
 const SAVANTE_PROMPT = BUILTIN_PERSONAS.find((p) => p.id === 'savante')?.prompt || '';
@@ -78,6 +82,7 @@ export default function Console() {
   const [fb, setFb] = useState<Record<string, 'up' | 'down'>>({});
   const [sessions, setSessions] = useState<Session[]>([]);
   const activeSession = useRef<string | null>(null);
+  const [showTerm, setShowTerm] = useState(false);      // Claude terminal popup
   const [autonomous, setAutonomous] = useState(true);   // self-provision (auto-pull) — default ON
   const [sagi, setSagi] = useState(false);              // sAGI mode from Savante — default OFF
 
@@ -241,6 +246,7 @@ export default function Console() {
   return (
     <>
     <Substrate a={sub.a} b={sub.b} seed={sub.seed} flux={sagiRunning ? 0.85 : status === 'submitted' ? 0.4 : status === 'streaming' ? 0.7 : 0} />
+    {showTerm && <ClaudeTerminal onClose={() => setShowTerm(false)} />}
     <div className="app">
       <aside className="side">
         <div className="brand">
@@ -280,6 +286,7 @@ export default function Console() {
           </span>
           <div className="spacer" />
           <div className={'toggle' + (think ? ' on' : '')} onClick={() => setThink((v) => !v)} title="Show the model's reasoning stream"><span className="switch" /><span className="small">reasoning</span></div>
+          <button className="btn ghost sm" onClick={() => setShowTerm(true)} title="Open an interactive terminal — type `claude` to sign in with your subscription and work on the dapp">⌘ Terminal</button>
           <span className={'pill' + (busy ? ' livecount' : '')} title="tokens this conversation (live while generating)">🪙 {sessionTokens.toLocaleString()}{busy ? ' ·' : ''}</span>
         </div>
 

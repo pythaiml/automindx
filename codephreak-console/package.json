@@ -6,16 +6,21 @@
   "scripts": {
     "dev": "next dev -p 3100",
     "build": "next build",
-    "start": "next start -p 3100"
+    "start": "next start -p 3100",
+    "pty": "node pty-server.js"
   },
   "dependencies": {
     "@ai-sdk/react": "4.0.10",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "ai": "7.0.9",
     "next": "^15.5.19",
+    "node-pty": "^1.1.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "react-markdown": "9.0.1",
     "remark-gfm": "4.0.0",
+    "ws": "^8.21.0",
     "zod": "3.25.76"
   },
   "devDependencies": {

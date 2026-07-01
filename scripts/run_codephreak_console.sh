@@ -10,13 +10,17 @@ cd "$(dirname "$0")/.."   # repo root (this script lives in scripts/)
 echo "▸ Starting self-improving engine (codephreak.py) on :5001 …"
 python3 codephreak.py >/tmp/codephreak_engine.log 2>&1 &
 ENGINE_PID=$!
-trap "kill $ENGINE_PID 2>/dev/null" EXIT
 
 cd codephreak-console
 if [ ! -d node_modules ]; then
   echo "▸ Installing console dependencies (first run) …"
   npm install --no-audit --no-fund
 fi
+echo "▸ Starting interactive terminal bridge (pty-server) on ws://127.0.0.1:3101 …"
+echo "  (open ⌘ Terminal in the console, type 'claude' to sign in with your subscription)"
+node pty-server.js >/tmp/codephreak_pty.log 2>&1 &
+PTY_PID=$!
+trap "kill $ENGINE_PID $PTY_PID 2>/dev/null" EXIT
 echo "▸ Starting Codephreak console on http://localhost:3100 …"
 echo "  default model: gpt-oss:120b-cloud  ·  reasoning + scientific settings on"
 npm run dev
