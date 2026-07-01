@@ -77,8 +77,33 @@ export async function POST(req: Request) {
       });
 
       if (!res.ok || !res.body) {
+        // Model isn't accessible — answer the *accessibility* question directly in
+        // the response field (not as a red error), with a login/subscribe link.
         const detail = await res.text().catch(() => '');
-        throw new Error(`Ollama HTTP ${res.status}: ${detail.slice(0, 300)}`);
+        const upgrade = (/https?:\/\/[^\s"')]+/.exec(detail) || [])[0] || 'https://ollama.com/settings';
+        let md: string;
+        if (res.status === 403 && /subscription|forbidden|access/i.test(detail)) {
+          md =
+            `☁️ **${model}** is an Ollama **cloud** model and isn't accessible on this account yet.\n\n` +
+            `**To use it:**\n` +
+            `1. Sign in to Ollama Cloud — run \`ollama signin\`, or log in at [ollama.com/signin](https://ollama.com/signin)\n` +
+            `2. If the model needs a plan, subscribe at [${upgrade}](${upgrade})\n\n` +
+            `Meanwhile you can pick a **local** model, or the free **\`gpt-oss:120b-cloud\`**, from the model selector above.`;
+        } else if (res.status === 404 || /not found|no such model/i.test(detail)) {
+          md = `**${model}** isn't available locally. Pull it first: \`ollama pull ${model}\` — or choose another model from the selector.`;
+        } else {
+          md =
+            `⚠️ **${model}** isn't reachable right now (Ollama HTTP ${res.status}).\n\n` +
+            `${detail.slice(0, 200)}\n\nCheck that \`ollama serve\` is running, then try again.`;
+        }
+        writer.write({ type: 'text-start', id: 't0' } as any);
+        writer.write({ type: 'text-delta', id: 't0', delta: md } as any);
+        writer.write({ type: 'text-end', id: 't0' } as any);
+        writer.write({
+          type: 'message-metadata',
+          messageMetadata: { model, accessible: false, status: res.status },
+        } as any);
+        return;
       }
 
       const reader = res.body.getReader();

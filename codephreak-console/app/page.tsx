@@ -40,7 +40,18 @@ const PRESETS: Record<string, Partial<Settings>> = {
   Mirostat: { temperature: 0.8, mirostat: 2, mirostat_tau: 5.0, mirostat_eta: 0.1 },
 };
 
-const LS = { personas: 'cpk.personas', active: 'cpk.activePersona', settings: 'cpk.settings', history: 'cpk.history', think: 'cpk.think' };
+const LS = { personas: 'cpk.personas', active: 'cpk.activePersona', settings: 'cpk.settings', history: 'cpk.history', think: 'cpk.think', prefs: 'cpk.prefs' };
+
+// Actual, persisted user preferences (applied live).
+const PREFS_DEFAULT = {
+  name: 'You',
+  avatar: '',           // data URL — your avatar
+  botAvatar: '',        // data URL — codephreak's avatar
+  accent: '#2ee6a6',    // emerald by default
+  accent2: '#37b6ff',
+  chatFont: 14,         // px
+};
+type Prefs = typeof PREFS_DEFAULT;
 
 const uid = () => 'id_' + Date.now().toString(36) + Math.floor(performance.now() % 1e6).toString(36);
 const textOf = (m: any) => (m?.parts || []).filter((p: any) => p.type === 'text').map((p: any) => p.text).join('');
@@ -61,6 +72,8 @@ export default function Console() {
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const activeSession = useRef<string | null>(null);
+  const [prefs, setPrefs] = useState<Prefs>(PREFS_DEFAULT);       // live (applied as preview)
+  const [savedPrefs, setSavedPrefs] = useState<Prefs>(PREFS_DEFAULT); // last persisted snapshot
 
   const { messages, sendMessage, status, stop, setMessages, error } = useChat();
   const logRef = useRef<HTMLDivElement>(null);
@@ -85,6 +98,7 @@ export default function Console() {
       const s = localStorage.getItem(LS.settings); if (s) setSettings({ ...DEFAULTS, ...JSON.parse(s) });
       const h = localStorage.getItem(LS.history); if (h) setSessions(JSON.parse(h));
       const t = localStorage.getItem(LS.think); if (t) setThink(t === '1');
+      const pr = localStorage.getItem(LS.prefs); if (pr) { const v = { ...PREFS_DEFAULT, ...JSON.parse(pr) }; setPrefs(v); setSavedPrefs(v); }
     } catch {}
     loadModels(); const iv = setInterval(loadModels, 8000); return () => clearInterval(iv);
   }, []);
@@ -92,6 +106,18 @@ export default function Console() {
   useEffect(() => { localStorage.setItem(LS.personas, JSON.stringify(personas)); }, [personas]);
   useEffect(() => { localStorage.setItem(LS.active, activePersona); }, [activePersona]);
   useEffect(() => { localStorage.setItem(LS.think, think ? '1' : '0'); }, [think]);
+  // Apply preferences live as a PREVIEW (accent, chat font). Persisted only on Save.
+  useEffect(() => {
+    const root = document.documentElement.style;
+    root.setProperty('--accent', prefs.accent);
+    root.setProperty('--accent-2', prefs.accent2);
+    root.setProperty('--chat-font', prefs.chatFont + 'px');
+  }, [prefs]);
+  const prefsDirty = JSON.stringify(prefs) !== JSON.stringify(savedPrefs);
+  function savePrefs() {
+    localStorage.setItem(LS.prefs, JSON.stringify(prefs));
+    setSavedPrefs(prefs);
+  }
   useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, status]);
   useEffect(() => { if (status === 'ready' && messages.length) saveSession(messages); /* eslint-disable-next-line */ }, [status]);
 
@@ -153,6 +179,28 @@ export default function Console() {
   const [copied, setCopied] = useState<string | null>(null);
   async function copy(text: string, key: string) { try { await navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied(null), 1200); } catch {} }
 
+  // Avatar upload → resized data URL (kept small so localStorage stays happy).
+  function uploadAvatar(file: File | undefined, key: 'avatar' | 'botAvatar') {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 128;
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d');
+        if (!ctx) { setPrefs((p) => ({ ...p, [key]: String(reader.result) })); return; }
+        // center-crop square
+        const s = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+        setPrefs((p) => ({ ...p, [key]: c.toDataURL('image/png') }));
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }
+
   // Realtime feedback → self-improving codephreak.py engine (via /api/feedback).
   async function feedback(msg: any, rating: 'up' | 'down') {
     setFb((f) => ({ ...f, [msg.id]: rating }));
@@ -193,8 +241,8 @@ export default function Console() {
     <div className="app">
       <aside className="side">
         <div className="brand">
-          <div className="logo">codephreak</div>
-          <div className="sub">automindX · AI SDK</div>
+          <div className="logo">automind<span className="x">X</span></div>
+          <div className="sub">Intelligent Autonomous ML</div>
         </div>
         <nav className="nav">
           <div className="grp">Session</div>
@@ -204,12 +252,13 @@ export default function Console() {
           <Nav id="advanced" tab={tab} set={setTab} ico="⚙" label="Advanced" />
           <Nav id="scientific" tab={tab} set={setTab} ico="⚛" label="Scientific" />
           <Nav id="persona" tab={tab} set={setTab} ico="☰" label=".persona" />
+          <Nav id="prefs" tab={tab} set={setTab} ico="⛭" label="Preferences" />
           <Nav id="about" tab={tab} set={setTab} ico="ⓘ" label="About" />
           <div style={{ padding: '14px 8px' }}>
             <button className="btn ghost sm" style={{ width: '100%' }} onClick={newChat}>+ New chat</button>
           </div>
         </nav>
-        <div className="foot">Professor Codephreak<br />automindX · gpt-oss default</div>
+        <div className="foot">automind<b style={{ color: 'var(--accent)' }}>X</b> · IAML<br />codephreak persona · gpt-oss</div>
       </aside>
 
       <main className="main">
@@ -245,7 +294,11 @@ export default function Console() {
                   const isLast = m.id === lastAId;
                   return (
                     <div key={m.id} className={'msg ' + m.role}>
-                      <div className="av">{m.role === 'user' ? 'YOU' : 'cpk'}</div>
+                      <div className="av">
+                        {m.role === 'user'
+                          ? (prefs.avatar ? <img src={prefs.avatar} alt="" /> : (prefs.name || 'YOU').slice(0, 3).toUpperCase())
+                          : (prefs.botAvatar ? <img src={prefs.botAvatar} alt="" /> : 'cpk')}
+                      </div>
                       <div className="bubble">
                         {m.role === 'assistant' && reasoning && (
                           <details className="think" open={!body}>
@@ -397,6 +450,64 @@ export default function Console() {
                   </li>
                 ))}</ul>
               )}
+            </div>
+          </section>
+
+          {/* PREFERENCES */}
+          <section className={'view' + (tab === 'prefs' ? ' active' : '')}
+            onKeyDown={(e) => { if (e.key === 'Enter' && prefsDirty) { e.preventDefault(); savePrefs(); } }}>
+            <h1>Preferences</h1>
+            <p className="lead">Your identity and the look of the console. Changes preview live; press <span className="kbd">Enter</span> or <b>Save</b> to keep them.</p>
+            <div className="card">
+              <h3>Avatars</h3>
+              <div className="hint">Upload an image (any size — it&apos;s center-cropped to a 128px square). Shown beside each message.</div>
+              <div className="grid2" style={{ marginTop: 6 }}>
+                <div className="avpref">
+                  <div className="av lg">{prefs.avatar ? <img src={prefs.avatar} alt="" /> : (prefs.name || 'YOU').slice(0, 3).toUpperCase()}</div>
+                  <div>
+                    <div className="small" style={{ marginBottom: 6 }}>Your avatar</div>
+                    <label className="btn sm" style={{ cursor: 'pointer' }}>Upload…
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => uploadAvatar(e.target.files?.[0], 'avatar')} />
+                    </label>
+                    {prefs.avatar && <button className="btn ghost sm" style={{ marginLeft: 6 }} onClick={() => setPrefs((p) => ({ ...p, avatar: '' }))}>Remove</button>}
+                  </div>
+                </div>
+                <div className="avpref">
+                  <div className="av lg bot">{prefs.botAvatar ? <img src={prefs.botAvatar} alt="" /> : 'cpk'}</div>
+                  <div>
+                    <div className="small" style={{ marginBottom: 6 }}>Codephreak avatar</div>
+                    <label className="btn sm" style={{ cursor: 'pointer' }}>Upload…
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => uploadAvatar(e.target.files?.[0], 'botAvatar')} />
+                    </label>
+                    {prefs.botAvatar && <button className="btn ghost sm" style={{ marginLeft: 6 }} onClick={() => setPrefs((p) => ({ ...p, botAvatar: '' }))}>Remove</button>}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="card">
+              <h3>Identity & appearance</h3>
+              <div className="field"><div><label>Display name</label><div className="desc">shown on your messages</div></div>
+                <input value={prefs.name} onChange={(e) => setPrefs((p) => ({ ...p, name: e.target.value }))} />
+                <div className="val" />
+              </div>
+              <div className="field"><div><label>Accent colour</label><div className="desc">primary highlight</div></div>
+                <input type="color" value={prefs.accent} onChange={(e) => setPrefs((p) => ({ ...p, accent: e.target.value }))} style={{ height: 36, padding: 3 }} />
+                <div className="val mono">{prefs.accent}</div>
+              </div>
+              <div className="field"><div><label>Secondary colour</label><div className="desc">accents & cloud tags</div></div>
+                <input type="color" value={prefs.accent2} onChange={(e) => setPrefs((p) => ({ ...p, accent2: e.target.value }))} style={{ height: 36, padding: 3 }} />
+                <div className="val mono">{prefs.accent2}</div>
+              </div>
+              <Slider k="chatFont" label="Chat text size" desc="pixels" min={12} max={20} step={1} s={prefs} set={setPrefs} />
+            </div>
+            <div className="savebar">
+              <button className="btn primary" onClick={savePrefs} disabled={!prefsDirty}>{prefsDirty ? 'Save preferences' : '✓ Saved'}</button>
+              <button className="btn ghost sm" onClick={() => setPrefs(savedPrefs)} disabled={!prefsDirty}>Revert</button>
+              <button className="btn ghost sm" onClick={() => setPrefs(PREFS_DEFAULT)}>Reset to defaults</button>
+              <span className="spacer" />
+              <span className={'savestate ' + (prefsDirty ? 'dirty' : 'clean')}>
+                {prefsDirty ? '● unsaved changes — press Enter to save' : '✓ all changes saved'}
+              </span>
             </div>
           </section>
 
