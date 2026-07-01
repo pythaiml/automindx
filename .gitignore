@@ -21,3 +21,6 @@ memory/*.json
 memory/*.jsonl
 codephreak-console/node_modules/
 codephreak-console/.next/
+
+# sagi self-build output (runtime)
+sagi/modules/*.md

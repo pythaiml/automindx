@@ -87,6 +87,8 @@ export default function Console() {
   const [sagiLog, setSagiLog] = useState<{ step: number; title: string; body: string }[]>([]);
   const sagiStop = useRef(false);
   const SAGI_MAX_STEPS = 16; // guard against runaway model calls
+  const [sagiDisk, setSagiDisk] = useState<{ count: number; last?: string }>({ count: 0 });
+  async function loadSagiDisk() { try { const j = await (await fetch('/api/sagi')).json(); if (j.ok) setSagiDisk({ count: j.count }); } catch {} }
 
   const { messages, sendMessage, status, stop, setMessages, error } = useChat();
   const logRef = useRef<HTMLDivElement>(null);
@@ -137,6 +139,7 @@ export default function Console() {
   }
   useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, status]);
   useEffect(() => { if (status === 'ready' && messages.length) saveSession(messages); /* eslint-disable-next-line */ }, [status]);
+  useEffect(() => { if (tab === 'sagi') loadSagiDisk(); /* eslint-disable-next-line */ }, [tab]);
 
   async function loadModels() {
     try { const r = await fetch('/api/models'); const j: Models = await r.json(); setModels(j);
@@ -236,9 +239,16 @@ export default function Console() {
     const ask = operatorInput
       ? `${base}\nThe operator directs this step: "${operatorInput}". Specify this module: a short Title line, then a concise spec (purpose · interface · how it plugs into an agnostic core · how it advances self-building).`
       : `${base}\nPropose and specify the NEXT single module (do not repeat a module already built): a short Title line, then a concise spec (purpose · interface · how it plugs into an agnostic core · how it advances self-building). Keep it modular and includable in any project (including as a Tauri app).`;
+    const priorCount = priorTitles !== undefined ? (priorTitles ? priorTitles.split(';').filter((s) => s.trim()).length : 0) : sagiLog.length;
+    const step = priorCount + 1;
     const text = await collectChat(SAVANTE_PROMPT + SAGI_DIRECTIVE, ask);
     const title = (text.split('\n').find((l) => l.trim()) || 'Module').replace(/^#+\s*|^\*+|^Title:\s*/i, '').replace(/\*+$/, '').slice(0, 90);
     setSagiLog((l) => [...l, { step: l.length + 1, title, body: text }]);
+    // Persist the module to the agnostic sagi/ package on disk (self-building architecture).
+    try {
+      const j = await (await fetch('/api/sagi', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ step, title, body: text }) })).json();
+      if (j.ok) setSagiDisk({ count: j.count, last: j.file });
+    } catch {}
     return title;
   }
 
@@ -474,7 +484,8 @@ export default function Console() {
             <div className="card">
               <div className="row" style={{ marginBottom: 10 }}>
                 <span className={'badge ' + (autonomous ? 'on' : '')}>{autonomous ? 'autonomous · continuous loop' : 'manual · one step per input'}</span>
-                <span className="badge">{sagiLog.length} module{sagiLog.length === 1 ? '' : 's'} built</span>
+                <span className="badge">{sagiLog.length} built this session</span>
+                <span className="badge on" title="persisted to the sagi/ package on disk">💾 {sagiDisk.count} on disk → sagi/modules/</span>
                 <span className="spacer" />
                 {autonomous
                   ? (sagiRunning
