@@ -5,12 +5,16 @@ export const LS = {
   autonomous: 'cpk.autonomous', sagi: 'cpk.sagi',
 };
 
+// Professor Codephreak is an NFT (github.com/Professor-Codephreak → OpenSea).
+export const CODEPHREAK_AVATAR = 'https://avatars.githubusercontent.com/u/140855987?v=4';
+export const CODEPHREAK_NFT = 'https://opensea.io/item/ethereum/0x52525cf31cc267d9635c38ec9ec99596f4664dc8/1';
+
 export const PREFS_DEFAULT = {
   name: 'You',
-  avatar: '',      // data URL — your avatar
-  botAvatar: '',   // data URL — codephreak's avatar
+  avatar: '',                     // data URL — your avatar
+  botAvatar: CODEPHREAK_AVATAR,   // codephreak's NFT identity (overridable)
   accent: '#2ee6a6',
   accent2: '#37b6ff',
-  chatFont: 14,    // px
+  chatFont: 14,                   // px
 };
 export type Prefs = typeof PREFS_DEFAULT;

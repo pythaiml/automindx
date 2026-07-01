@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { BUILTIN_PERSONAS, CODEPHREAK_PERSONA, type Persona } from '@/lib/persona';
-import { LS } from '@/lib/store';
+import { LS, CODEPHREAK_NFT } from '@/lib/store';
 import { usePrefs } from '@/hooks/usePrefs';
 import { useModels } from '@/hooks/useModels';
 import { useSagi } from '@/hooks/useSagi';
@@ -228,7 +228,7 @@ export default function Console() {
   const sub = PERSONA_SUBSTRATE[sagi ? 'savante' : activePersona] || PERSONA_SUBSTRATE.codephreak;
   return (
     <>
-    <Substrate a={sub.a} b={sub.b} seed={sub.seed} />
+    <Substrate a={sub.a} b={sub.b} seed={sub.seed} flux={busy || sagiRunning ? 1 : 0} />
     <div className="app">
       <aside className="side">
         <div className="brand">
@@ -574,7 +574,7 @@ export default function Console() {
                 <div className="avpref">
                   <div className="av lg bot">{prefs.botAvatar ? <img src={prefs.botAvatar} alt="" /> : 'cpk'}</div>
                   <div>
-                    <div className="small" style={{ marginBottom: 6 }}>Codephreak avatar</div>
+                    <div className="small" style={{ marginBottom: 6 }}>Codephreak avatar <a href={CODEPHREAK_NFT} target="_blank" rel="noreferrer" className="badge" style={{ marginLeft: 4 }}>NFT ↗</a></div>
                     <label className="btn sm" style={{ cursor: 'pointer' }}>Upload…
                       <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => uploadAvatar(e.target.files?.[0], 'botAvatar')} />
                     </label>
