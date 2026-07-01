@@ -198,6 +198,7 @@ python3 uiux.py \
 - Original codephreak (historical) — <https://github.com/Professor-Codephreak/automind>
 - **mindX** — the production system aGLM was distilled from · docs: **[mindx.pythai.net/docs.html](https://mindx.pythai.net/docs.html)**
 - **[rage.pythai.net](https://rage.pythai.net)** — the public broadcast layer ("public noise"), where mindX publishes in the voice of mindX via its **AuthorAgent**; Professor Codephreak has published there occasionally
+- **Songs** — the personas appear in music by **mag-magnus**: [Professor Codephreak — Deep Dark Mix](https://soundcloud.com/mag-magnus/professor-code-freak-deep-dark-mix-2) · [Terminal Recursion 5 (feat. Savante)](https://soundcloud.com/mag-magnus/terminal-recursion-5)
 
 > **RAGE remembers · aGLM decides · MASTERMIND orchestrates.**
 
