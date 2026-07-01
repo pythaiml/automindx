@@ -45,7 +45,10 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: #2c3e59; background-clip: padding-box; }
 a { color: var(--accent); text-decoration: none; }
 
-.app { display: grid; grid-template-columns: 232px 1fr; height: 100vh; }
+/* WebGL substrate — sits behind everything; the UI floats above it. */
+.substrate { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; opacity: .6; }
+.app { display: grid; grid-template-columns: 232px 1fr; height: 100vh; position: relative; z-index: 1; }
+.main { background: transparent; }
 
 /* ---- Sidebar (raised rail) ---- */
 .side {

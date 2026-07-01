@@ -38,5 +38,13 @@ builds one module per input → response. Each step is appended to `manifest.jso
 and can be exported. Turning **Autonomous off** stops the continuous loop.
 
 > sagi is agnostic by construction: the console is only one host. The same
-> modules and manifest can be driven by `automind_aglm.py` (the aGLM PODA loop)
-> or any other orchestrator.
+> contract is driven **headless** by `sagi_build.py` (which can run the build via
+> the migrated `aglm.AutonomousLoop` PODA cycle):
+>
+> ```bash
+> python3 sagi_build.py --steps 3                 # build 3 modules
+> python3 sagi_build.py --loop --steps 5          # via the aGLM autonomous loop
+> ```
+>
+> Both hosts write the same `modules/` + `manifest.json`, proving sagi is
+> orchestrator-agnostic.

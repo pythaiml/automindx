@@ -5,9 +5,22 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { BUILTIN_PERSONAS, CODEPHREAK_PERSONA, type Persona } from '@/lib/persona';
+import Substrate from './Substrate';
 
 const BUILTIN_IDS = new Set(BUILTIN_PERSONAS.map((p) => p.id));
 const SAVANTE_PROMPT = BUILTIN_PERSONAS.find((p) => p.id === 'savante')?.prompt || '';
+
+// Each persona gives the WebGL substrate its own colours + field seed, so the
+// backdrop "becomes" the active persona (smoothly transitioned in Substrate).
+const PERSONA_SUBSTRATE: Record<string, { a: string; b: string; seed: number }> = {
+  codephreak: { a: '#2ee6a6', b: '#37b6ff', seed: 0 },
+  automindx: { a: '#7c5cff', b: '#2ee6a6', seed: 11 },
+  jaimla: { a: '#37b6ff', b: '#2ee6a6', seed: 23 },
+  savante: { a: '#f5c451', b: '#37b6ff', seed: 37 },
+  sentinel: { a: '#ff5c7a', b: '#ffb454', seed: 51 },
+  architect: { a: '#5c8cff', b: '#2ee6a6', seed: 67 },
+  mentor: { a: '#46e0a0', b: '#f5c451', seed: 83 },
+};
 
 // ─────────────────────────────────────────────────────────────────────────
 // Single source of truth. The persona you edit here IS the system prompt sent
@@ -242,7 +255,8 @@ export default function Console() {
     const priorCount = priorTitles !== undefined ? (priorTitles ? priorTitles.split(';').filter((s) => s.trim()).length : 0) : sagiLog.length;
     const step = priorCount + 1;
     const text = await collectChat(SAVANTE_PROMPT + SAGI_DIRECTIVE, ask);
-    const title = (text.split('\n').find((l) => l.trim()) || 'Module').replace(/^#+\s*|^\*+|^Title:\s*/i, '').replace(/\*+$/, '').slice(0, 90);
+    const title = ((text.split('\n').find((l) => l.trim()) || 'Module')
+      .replace(/\*\*/g, '').replace(/^#+\s*|^title:\s*|^module\s*\d*\s*[:\-–]\s*/i, '').trim().slice(0, 90)) || 'Module';
     setSagiLog((l) => [...l, { step: l.length + 1, title, body: text }]);
     // Persist the module to the agnostic sagi/ package on disk (self-building architecture).
     try {
@@ -361,7 +375,10 @@ export default function Console() {
     'Design a secure JWT auth flow — modular and concise.',
   ];
 
+  const sub = PERSONA_SUBSTRATE[sagi ? 'savante' : activePersona] || PERSONA_SUBSTRATE.codephreak;
   return (
+    <>
+    <Substrate a={sub.a} b={sub.b} seed={sub.seed} />
     <div className="app">
       <aside className="side">
         <div className="brand">
@@ -725,6 +742,10 @@ export default function Console() {
           <section className={'view' + (tab === 'about' ? ' active' : '')}>
             <h1>Professor Codephreak — the definitive console</h1>
             <p className="lead">A cutting-edge front end for automindX built on the Vercel AI SDK v7, streaming from Ollama via the native endpoint so every scientific parameter genuinely takes effect. <b>gpt-oss</b> is the default model.</p>
+            <div className="card"><h3>Origins</h3>
+              <p className="small dim">automindX (IAML — “I Am Machine Learning”) grew from the Professor Codephreak / easyAGI lineage into an autonomous machine-intelligence environment. It is one consumer of the aGLM patterns distilled in <a href="https://mindx.pythai.net/automindx" target="_blank" rel="noreferrer">mindX</a>. The living WebGL substrate behind this console is a tasteful homage to the automindX substrate layer at <a href="https://mindx.pythai.net/automindx" target="_blank" rel="noreferrer">mindx.pythai.net/automindx</a> — it shifts to become the active persona.</p>
+              <div className="row" style={{ marginTop: 8 }}>{['github.com/Professor-Codephreak', 'github.com/GATERAGE', 'mindx.pythai.net/automindx', 'rage.pythai.net'].map((l) => <a key={l} className="badge" href={'https://' + l} target="_blank" rel="noreferrer">{l}</a>)}</div>
+            </div>
             <div className="card"><h3>Perfect symmetry</h3>
               <p className="small dim">The persona you edit in <span className="mono">.persona</span> is the exact system prompt sent to the model; the sliders in <span className="mono">Advanced</span>/<span className="mono">Scientific</span> are the exact Ollama options. Nothing is hidden between the prompt and the code — what you see is what runs.</p>
             </div>
@@ -739,6 +760,7 @@ export default function Console() {
         </div>
       </main>
     </div>
+    </>
   );
 }
 
