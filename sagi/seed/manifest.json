@@ -1,0 +1,11 @@
+{
+  "name": "sagi-seed",
+  "description": "Canonical point-of-departure modules an individual sAGI ships first",
+  "grown_from": "Savante persona (automindX) via the sAGI · individual expansion template",
+  "ship_order": ["individuality-core", "self-package-boundary", "module-registry"],
+  "modules": [
+    { "step": 1, "id": "individuality-core", "file": "01-individuality-core.md", "deps": [], "motto": "be thyself" },
+    { "step": 2, "id": "self-package-boundary", "file": "02-self-package-boundary.md", "deps": ["individuality-core"], "motto": "keep thyself honest" },
+    { "step": 3, "id": "module-registry", "file": "03-module-registry.md", "deps": ["self-package-boundary"], "motto": "grow thyself" }
+  ]
+}
