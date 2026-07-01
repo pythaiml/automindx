@@ -71,11 +71,50 @@ Optional deps for the RAGE backend: `pip install psycopg2-binary pgvector senten
   the running `codephreak.py` engine exposes **`GET /healthz`** for Docker/K8s probes.
 - Per-request timeout is enforced on the model call (`AUTOMINDX_TIMEOUT`).
 
-## Codephreak audit coverage
+## Versioned model config + integrity (audit #9)
 
-Done: **#1** service layer · **#2** persistent memory (SQLite + pgvector) ·
-**#3** lazy cached model · **#4** input sanitization · **#5** structured JSON logs ·
-**#6** modular env config · **#7** pytest · **#8** resource/overload limits ·
-**#12** health check. Deferred (rationale in [CODEPHREAK_AUDIT.md](CODEPHREAK_AUDIT.md)):
-**#9** versioned checkpoints and **#10** OS-keyring secrets (N/A / minimal for the
-Ollama-daemon model + local-first posture; secrets already env-only, never embedded).
+`ModelRegistry` snapshots the reproducible tuple that determines a run —
+`{model, options, persona hash, git SHA, Ollama model digest}` — under
+`models/v{N}/metadata.json` with a `registry.json` index. Enables rollback
+(`set_latest`) and reproducibility. Since models live in the Ollama daemon (not
+torch `.pt` files), the **Ollama model digest** is the integrity anchor:
+`verify()` confirms the daemon still serves the exact digest recorded at register
+time — the analogue of a checkpoint SHA-256.
+
+```python
+from services import ModelRegistry
+reg = ModelRegistry()
+reg.register("gpt-oss:120b-cloud", options={"temperature": 0.7}, persona=prompt)
+reg.verify()          # {ok, expected_digest, current_digest}
+reg.set_latest("v1.0")  # rollback
+```
+
+## Secrets (audit #10)
+
+`services.secrets.get_secret(name)` resolves from the **OS keyring** first
+(`keyring`/Vault), then env — never hard-coded, never logged (`redact()`).
+`ModelService` pulls the Ollama cloud key through it. Store one with
+`set_secret("OLLAMA_API_KEY", value)` (goes to the keyring, not disk).
+
+## Container hardening (Podman)
+
+Run the engine in a rootless, resource-capped **Podman** container:
+
+```bash
+podman run --rm --userns=keep-id --user 1000 \
+  --memory 2g --cpus 2 --cap-drop ALL --read-only \
+  -p 5001:5001 automindx:latest python3 codephreak.py
+```
+
+(Podman is rootless and daemonless by default — preferred over Docker here.)
+
+## Codephreak audit coverage — complete
+
+**#1** service layer · **#2** persistent memory (SQLite + pgvector) ·
+**#3** lazy cached model · **#4** input sanitization (+ role-injection defense) ·
+**#5** structured JSON logs · **#6** modular env config · **#7** pytest (15) ·
+**#8** resource/overload limits · **#9** versioned config + digest integrity ·
+**#10** keyring secrets · **#12** health check. Plus file perms (DB 0600) and
+Podman container hardening. Model inference runs in the Ollama daemon, so the
+torch-checkpoint sandbox subprocess (#5 variant) is N/A — isolation comes from
+the daemon boundary + the overload guard + per-request timeout.

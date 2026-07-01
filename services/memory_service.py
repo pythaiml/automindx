@@ -31,6 +31,13 @@ class MemoryService:
 
     def _ensure_schema(self) -> None:
         with self._lock, closing(self._connect()) as conn:
+            # Restrict the memory DB to the owner (0600) — it holds conversation
+            # history (codephreak security checklist: file permissions).
+            try:
+                if os.path.exists(self.db_path):
+                    os.chmod(self.db_path, 0o600)
+            except OSError:
+                pass
             conn.execute(
                 """CREATE TABLE IF NOT EXISTS context (
                        id INTEGER PRIMARY KEY AUTOINCREMENT,

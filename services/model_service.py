@@ -33,7 +33,9 @@ class ModelService:
         self.model = model or settings.model
         self.host = settings.ollama_host
         self._session = requests.Session()
-        key = os.getenv(settings.ollama_api_key_env)
+        # Secret resolved via keyring→env (audit #10) — never hard-coded/logged.
+        from .secrets import get_secret
+        key = get_secret(settings.ollama_api_key_env)
         if key:
             self._session.headers["Authorization"] = f"Bearer {key}"
         self._ready = True
