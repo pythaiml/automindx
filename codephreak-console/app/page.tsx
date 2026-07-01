@@ -24,15 +24,18 @@ const SAVANTE_PROMPT = BUILTIN_PERSONAS.find((p) => p.id === 'savante')?.prompt 
 
 // Each persona gives the WebGL substrate its own colours + field seed, so the
 // backdrop "becomes" the active persona (smoothly transitioned in Substrate).
+// seeds are kept in a small spread so switching persona is a SUBTLE crossfade —
+// a big seed jump would scroll the noise domain. Colour is the real identifier,
+// and the per-persona wander phase (Substrate.tsx) keeps each one evolving distinctly.
 const PERSONA_SUBSTRATE: Record<string, { a: string; b: string; seed: number }> = {
   codephreak: { a: '#2ee6a6', b: '#37b6ff', seed: 0 },
-  automindx: { a: '#7c5cff', b: '#2ee6a6', seed: 11 },
-  jaimla: { a: '#37b6ff', b: '#2ee6a6', seed: 23 },
-  savante: { a: '#f5c451', b: '#37b6ff', seed: 37 },
-  sagi: { a: '#c792ea', b: '#2ee6a6', seed: 95 },
-  sentinel: { a: '#ff5c7a', b: '#ffb454', seed: 51 },
-  architect: { a: '#5c8cff', b: '#2ee6a6', seed: 67 },
-  mentor: { a: '#46e0a0', b: '#f5c451', seed: 83 },
+  automindx: { a: '#7c5cff', b: '#2ee6a6', seed: 1.4 },
+  jaimla: { a: '#37b6ff', b: '#2ee6a6', seed: 2.6 },
+  savante: { a: '#f5c451', b: '#37b6ff', seed: 3.7 },
+  sagi: { a: '#c792ea', b: '#2ee6a6', seed: 4.8 },
+  sentinel: { a: '#ff5c7a', b: '#ffb454', seed: 5.9 },
+  architect: { a: '#5c8cff', b: '#2ee6a6', seed: 7.1 },
+  mentor: { a: '#46e0a0', b: '#f5c451', seed: 8.3 },
 };
 
 // Every persona gets a UNIQUE substrate — built-ins above, custom ones derived
@@ -49,7 +52,7 @@ function substrateFor(id: string): { a: string; b: string; seed: number } {
   if (PERSONA_SUBSTRATE[id]) return PERSONA_SUBSTRATE[id];
   let h = 5381; for (let i = 0; i < id.length; i++) h = ((h * 33) ^ id.charCodeAt(i)) >>> 0;
   const hue = h % 360;
-  return { a: hslHex(hue), b: hslHex((hue + 150) % 360), seed: h % 97 };
+  return { a: hslHex(hue), b: hslHex((hue + 150) % 360), seed: (h % 100) / 10 };   // small seed → subtle transitions
 }
 
 // ─────────────────────────────────────────────────────────────────────────

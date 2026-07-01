@@ -16,6 +16,9 @@ float fbm(vec2 p){ float v=0.0, a=0.5; for(int i=0;i<6;i++){ v+=a*noise(p); p=p*
 void main(){
   vec2 uv = gl_FragCoord.xy / u_res.xy;
   vec2 p = uv * 3.0 + u_seed; p.x *= u_res.x/u_res.y;
+  // Slow per-persona evolution: a very gentle wander of the noise domain, its phase
+  // seeded by the persona, so each substrate is unique AND slowly evolving over time.
+  p += (0.45 - 0.3 * u_calm) * vec2(sin(u_time * 0.018 + u_seed), cos(u_time * 0.013 + u_seed * 1.3));
   float t = u_time * (0.06 + 0.08 * u_flux) * (1.0 - 0.7 * u_calm);   // steady; mellow (slow) in the persona picker
   // domain-warped flow — livelier warp under flux
   vec2 q = vec2(fbm(p + t), fbm(p - t + 5.2 + u_seed));
@@ -84,9 +87,11 @@ export default function Substrate({ a = '#2ee6a6', b = '#37b6ff', seed = 0, flux
       // Gentle, eased crossfade so persona transitions flow seamlessly:
       // colours ease over ~1s, the noise-domain seed drifts very slowly (no
       // abrupt scroll), flux stays responsive to thinking.
+      // Subtle persona transitions: colours ease slowly (~2s) and the noise-domain
+      // seed drifts very gently, so switching persona never jolts the background.
       const tg = target.current;
-      for (let i = 0; i < 3; i++) { cur.a[i] = lerp(cur.a[i], tg.a[i], 0.03); cur.b[i] = lerp(cur.b[i], tg.b[i], 0.03); }
-      cur.seed = lerp(cur.seed, tg.seed, 0.012);
+      for (let i = 0; i < 3; i++) { cur.a[i] = lerp(cur.a[i], tg.a[i], 0.018); cur.b[i] = lerp(cur.b[i], tg.b[i], 0.018); }
+      cur.seed = lerp(cur.seed, tg.seed, 0.005);
       cur.flux = lerp(cur.flux, tg.flux, 0.06);
       cur.calm = lerp(cur.calm, tg.calm, 0.05);           // ease into/out of the mellow picker state
       gl.uniform1f(uTime, (now - t0) / 1000); gl.uniform1f(uSeed, cur.seed); gl.uniform1f(uFlux, cur.flux); gl.uniform1f(uCalm, cur.calm);
