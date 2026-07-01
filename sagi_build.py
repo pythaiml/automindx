@@ -89,6 +89,23 @@ SAVANTE = (
     "general intelligence — one module per step."
 )
 
+# The dynamic self-audit prompt (21-self-prompt-auditor.py persists it here on every sAGI update).
+# When present it REPLACES the static SAVANTE so the headless backends inject the same live,
+# self-adjusting prompt the in-process host does; SAVANTE stays the guaranteed fallback.
+SYS_PROMPT_FILE = os.path.join(SAGI_DIR, "system_prompt.md")
+
+
+def _system() -> str:
+    """The system prompt to inject into the model: the dynamic self-audit if grown, else SAVANTE."""
+    try:
+        with open(SYS_PROMPT_FILE, encoding="utf-8") as f:
+            dyn = f.read().strip()
+            if dyn:
+                return dyn
+    except OSError:
+        pass
+    return SAVANTE
+
 
 def read_manifest() -> dict:
     try:
@@ -108,7 +125,7 @@ def _ask_ollama(model: str, prompt: str) -> str:
     r = requests.post(
         f"{OLLAMA}/api/chat",
         json={"model": model, "messages": [
-            {"role": "system", "content": SAVANTE},
+            {"role": "system", "content": _system()},
             {"role": "user", "content": prompt},
         ], "stream": False, "think": False, "options": {"num_predict": 400}},
         timeout=300,
@@ -126,7 +143,7 @@ def _ask_claude_cli(model: str, prompt: str) -> str:
     """
     if not shutil.which("claude"):
         raise RuntimeError("`claude` CLI not found on PATH — install Claude Code, or use --backend ollama")
-    cmd = ["claude", "-p", prompt, "--append-system-prompt", SAVANTE]
+    cmd = ["claude", "-p", prompt, "--append-system-prompt", _system()]
     if model and model.startswith("claude"):
         cmd += ["--model", model]
     out = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
@@ -142,7 +159,7 @@ def _ask_claude_api(model: str, prompt: str) -> str:
         raise RuntimeError("ANTHROPIC_API_KEY not set — export it, or use --backend claude-cli")
     mid = model if (model or "").startswith("claude") else ANTHROPIC_MODEL
     body = json.dumps({
-        "model": mid, "max_tokens": 1024, "system": SAVANTE,
+        "model": mid, "max_tokens": 1024, "system": _system(),
         "messages": [{"role": "user", "content": prompt}],
     }).encode()
     req = urllib.request.Request(

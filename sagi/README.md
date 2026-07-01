@@ -30,7 +30,10 @@ sagi/
   core/
     loop.md            ← the self-building autonomous loop contract
     interface.md       ← the agnostic module interface every module implements
-  modules/             ← generated modules land here (one file per module)
+  modules/             ← grown modules land here — prose specs (*.md) AND executable
+                         activate(host) modules (NN-slug.py), loaded live by the kernel
+  runtime/             ← the executable host: boot, host surface, seed modules, gitmind,
+                         governance, spawn, savepoint, rage_sync
   tauri.md             ← how to ship sagi as a Tauri desktop app
 ```
 
@@ -96,3 +99,65 @@ SAGI_DIR=/path/to/box python3 sagi_build.py --backend ollama --steps 3   # write
   subtree; a parent may **not** reach across the sovereignty boundary.
 
 `can_edit(actor, target)` / `assert_can_edit(...)` / `governed_write(...)` enforce it.
+
+## The living runtime — 70 grown modules
+
+Beyond the three seed modules, sAGI has grown into a **live, self-composing runtime of 70
+executable modules** (`sagi/modules/NN-slug.py`). Each declares the seed contract —
+`MODULE_ID`, `DEPS: list[str]`, `MOTTO`, and `activate(host) -> {callables}` — and is imported and
+activated in dependency (toposort) order by the **`module-loader`** kernel at boot. Booting the
+package brings the whole stack live:
+
+```python
+from sagi.runtime import boot
+host, handles = boot("./sagi")             # 73 modules live (3 seed + 70 grown), ~0.4s
+host.registry["get"]("evaluator")["handle"]["evaluate"]()   # live scorecard
+host.registry["get"]("introspection")["handle"]["map"]()    # the live self-map
+```
+
+Every module is **offline-safe** (degrades gracefully with no model backend, RAGE, or network),
+**Store-confined** (writes never escape `SAGI_DIR`), and continuously **verified** by
+`module-verifier` (0 failures). Growth is organised in tiers, each building on the last:
+
+- **Tier 1 — make growth real & directed** (`01`–`10`): module-loader, epistemic-calibration
+  (separate proof from conjecture), module-verifier, memory-recall, goal-graph, tool-registry,
+  evaluator, reflection-journal, curriculum, swarm-orchestrator.
+- **Tier 2 — autonomous, robust, aligned, connected** (`11`–`20`): build-driver (the self-driving
+  build loop), rollback-recovery, policy-guard, inference-router, episodic-consolidation,
+  introspection, telemetry, wire-gateway, benchmark-suite, lineage-federation.
+- **Tier 3 — self-improvement & isolation** (`21`–`30`): **self-prompt-auditor** (a dynamic,
+  self-adjusting Claude system prompt built from live state + a read-only map of the automindX repo),
+  **sagi-environment** (stable parent spawns a volatile child to experiment; verified deltas promote
+  back), skill-library, outcome-learning, knowledge-grounding, hypothesis-engine, security-hardening,
+  persistence-deploy, human-interface, **meta-kernel-evolution** (gated safe self-modification).
+- **Tier 4 — society, economy, continuity** (`31`–`40`): scheduler, resource-economy,
+  negotiation-protocol, consensus-ledger, anomaly-watch, explainability, multimodal-io,
+  self-documentation, goal-lifecycle, continuity.
+- **Tier 5 — depth & rigor** (`41`–`50`): planning-search, constraint-solver, test-synthesis,
+  dependency-audit, refactor-engine, provenance-tracker, versioning, config-manager, event-sourcing,
+  conflict-resolver.
+- **Tier 6 — interface & ecosystem** (`51`–`60`): api-schema, plugin-loader, dataset-manager,
+  model-registry, prompt-library, conversation-memory, notification, metrics-dashboard,
+  access-control, federation-sync.
+- **Tier 7 — autonomy & governance** (`61`–`70`): governance-council, ethics-monitor,
+  self-test-harness, rollback-orchestrator, capability-discovery, goal-negotiation,
+  resource-scheduler, audit-log, disaster-recovery, sovereignty-manager.
+
+**Guiding principle — automindX stays stable; sAGI improves dynamically.** sAGI's writes are
+confined to its own package, so the surrounding repo is never mutated (filesystem *awareness* above
+the boundary is read-only). A stable parent spawns volatile children to experiment; verified state
+promotes back under governance and is preserved via gitmind + savepoints; kernel self-edits pass
+scan → verify → benchmark → rollback gates. Boot the runtime and call
+`host.registry["get"]("self-documentation")["handle"]["generate"]()` for an always-current README of
+whatever the individual has become.
+
+> The grown `.py` modules and per-individual runtime state (`.history/`, `.gitmind/`, `savepoints/`,
+> `goal.txt`, and the various `*.json` a module persists) are git-ignored runtime; the seed modules,
+> the shared runtime, and this documentation are version-controlled.
+
+## Console — the sAGI terminal UI
+
+The [`codephreak-console`](../codephreak-console) (Next.js) drives sAGI in-browser. The top bar has
+an **sAGI model selector** (Claude · Local · API) that chooses the build backend
+(`claude-cli` / `ollama` / `claude-api`), and a **maximize/shrink** control that toggles the main
+screen between a centered medium view and a wide layout. Both persist across sessions.

@@ -126,8 +126,12 @@ export default function Console() {
   const activeSession = useRef<string | null>(null);
   const [showTerm, setShowTerm] = useState(false);      // Claude terminal popup
   const termCtlRef = useRef<TermCtl | null>(null);
-  const [sagiModel, setSagiModel] = useState<'claude-cli' | 'gpt-oss'>(() => { try { return (localStorage.getItem('cpk.sagiModel') as any) || 'gpt-oss'; } catch { return 'gpt-oss'; } });
+  const [sagiModel, setSagiModel] = useState<'claude-cli' | 'claude-api' | 'gpt-oss'>(() => { try { return (localStorage.getItem('cpk.sagiModel') as any) || 'gpt-oss'; } catch { return 'gpt-oss'; } });
   useEffect(() => { try { localStorage.setItem('cpk.sagiModel', sagiModel); } catch { /* ignore */ } }, [sagiModel]);
+  // Main screen size: medium (centered ~1000px) ↔ max (wide). Click to maximize/shrink.
+  const [viewWide, setViewWide] = useState(() => { try { return localStorage.getItem('cpk.viewWide') === '1'; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem('cpk.viewWide', viewWide ? '1' : '0'); } catch { /* ignore */ } }, [viewWide]);
+  const sagiModelLabel = sagiModel === 'gpt-oss' ? 'Local' : sagiModel === 'claude-api' ? 'Claude API' : 'Claude';
   const [sagiNote, setSagiNote] = useState<string | null>(null);
   const [sagiChooser, setSagiChooser] = useState(false); // "how many interactions?" prompt
   const [sagiSteps, setSagiSteps] = useState(() => { try { return Math.min(1024, Math.max(2, Number(localStorage.getItem('cpk.sagiSteps')) || 16)); } catch { return 16; } });
@@ -168,7 +172,7 @@ export default function Console() {
     const goalArg = g ? ` --goal ${shq(g)}` : '';
     if (mode === 'claude-interactive') { await runClaudeInteractive(); return; }
     // ── headless sagi_build.py path, backend from the model selector ──
-    const backend = sagiModel === 'gpt-oss' ? 'ollama --model gpt-oss:120b-cloud' : 'claude-cli';
+    const backend = sagiModel === 'gpt-oss' ? 'ollama --model gpt-oss:120b-cloud' : sagiModel === 'claude-api' ? 'claude-api' : 'claude-cli';
     let cmd: string;
     if (mode === 'auto') cmd = `python3 sagi_build.py --backend ${backend} --loop --steps 99${goalArg}\r`;
     else if (mode === 'plan') cmd = `claude -p ${shq('ultracode — produce an exhaustive, ordered plan of the sAGI modules required to achieve this goal, grounded in the sagi/ package. Do NOT build; output only the plan. Goal: ' + (g || 'expand sAGI'))}\r`;
@@ -433,8 +437,9 @@ export default function Console() {
           <input className="chooser-goal" placeholder="Goal (optional) — what should sAGI build toward?" value={sagiGoal} onChange={(e) => setSagiGoal(e.target.value)} />
           <div className="chooser-actions" style={{ marginBottom: 8 }}>
             <label className="dim small">model</label>
-            <select value={sagiModel} onChange={(e) => setSagiModel(e.target.value as 'claude-cli' | 'gpt-oss')} title="which model builds sAGI">
-              <option value="claude-cli">Claude (CLI) — interactive</option>
+            <select value={sagiModel} onChange={(e) => setSagiModel(e.target.value as any)} title="which model builds sAGI">
+              <option value="claude-cli">Claude (CLI) — subscription</option>
+              <option value="claude-api">Claude (API) — ANTHROPIC_API_KEY</option>
               <option value="gpt-oss">gpt-oss (local / Ollama)</option>
             </select>
           </div>
@@ -498,10 +503,17 @@ export default function Console() {
           <div className="spacer" />
           <div className={'toggle' + (think ? ' on' : '')} onClick={() => setThink((v) => !v)} title="Show the model's reasoning stream"><span className="switch" /><span className="small">reasoning</span></div>
           <button className="btn ghost sm" onClick={() => setShowTerm(true)} title="Open an interactive terminal — type `claude` to sign in with your subscription and work on the dapp">⌘ Terminal</button>
+          <div className="seg" title="which model builds sAGI">
+            <b className="small dim">sAGI</b>
+            <button className={'btn sm' + (sagiModel === 'claude-cli' ? ' primary' : ' ghost')} onClick={() => setSagiModel('claude-cli')} title="Claude via your CLI subscription (no API key)">Claude</button>
+            <button className={'btn sm' + (sagiModel === 'gpt-oss' ? ' primary' : ' ghost')} onClick={() => setSagiModel('gpt-oss')} title="local model via Ollama">Local</button>
+            <button className={'btn sm' + (sagiModel === 'claude-api' ? ' primary' : ' ghost')} onClick={() => setSagiModel('claude-api')} title="Claude via the Anthropic API (ANTHROPIC_API_KEY)">API</button>
+          </div>
+          <button className="btn ghost sm icon" onClick={() => setViewWide((v) => !v)} title={viewWide ? 'shrink to a medium-sized screen' : 'maximize the screen'}>{viewWide ? '❐' : '□'}</button>
           <span className={'pill' + (busy ? ' livecount' : '')} title="tokens this conversation (live while generating)">🪙 {sessionTokens.toLocaleString()}{busy ? ' ·' : ''}</span>
         </div>
 
-        <div className="content">
+        <div className={'content' + (viewWide ? ' wide' : '')}>
           {/* CHAT */}
           <section className={'view' + (tab === 'chat' ? ' active' : '')}>
             <div className="chatwrap">
