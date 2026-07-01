@@ -57,6 +57,19 @@ def test_config_defaults():
     assert settings.max_context >= 1 and settings.ollama_host.startswith("http")
 
 
+def test_automind_chat_delegates_to_service_layer():
+    import automind
+
+    class _Fake:
+        def run(self, text, sid=None):
+            return {"response": "delegated:" + text, "status": "ok", "session_id": "s"}
+
+    automind._ORCHESTRATOR = _Fake()  # bypass real orchestrator/model
+    assert automind.chat("hi") == "delegated:hi"
+    assert automind.chat("hi", full=True)["status"] == "ok"
+    automind._ORCHESTRATOR = None
+
+
 def test_health_snapshot():
     orch = InferenceOrchestrator()
     orch.model.ping = lambda: True

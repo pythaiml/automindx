@@ -40,3 +40,29 @@ def format_to_llama_chat_style(memory) -> str:
     prompt += f"{B_INST} {new_instruction} {E_INST}"
     return prompt
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Thin entry point (codephreak audit, integration step C).
+# automind.py is now a façade over the decoupled service layer: sanitize →
+# recall memory → infer → persist → structured logs, all behind one call.
+# The service layer is imported lazily to avoid a circular import (services/
+# inference_orchestrator imports DEFAULT_SYSTEM_PROMPT from here).
+# ─────────────────────────────────────────────────────────────────────────────
+_ORCHESTRATOR = None
+
+
+def chat(user_input, session_id=None, full=False):
+    """Process one turn through the service layer. Returns the assistant text
+    (or the full result dict when full=True)."""
+    global _ORCHESTRATOR
+    if _ORCHESTRATOR is None:
+        from services.inference_orchestrator import InferenceOrchestrator
+        _ORCHESTRATOR = InferenceOrchestrator()
+    result = _ORCHESTRATOR.run(user_input, session_id)
+    return result if full else result.get("response", "")
+
+
+if __name__ == "__main__":
+    import sys
+    print(chat(" ".join(sys.argv[1:]) or "Introduce yourself in one line."))
+

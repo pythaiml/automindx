@@ -22,6 +22,15 @@ orch = InferenceOrchestrator()
 out = orch.run("hello", session_id=None)   # returns {session_id, response, duration_ms, status}
 ```
 
+Or via the thin façade (codephreak integration step C) — `automind.py` now
+delegates to the service layer:
+
+```python
+from automind import chat
+chat("hello")                 # → assistant text
+chat("hello", full=True)      # → {session_id, request_id, response, duration_ms, status}
+```
+
 Or the REPL: `python3 -m services.inference_orchestrator`.
 
 ## Memory backends (SQLite ↔ pgvector)
