@@ -1,21 +1,30 @@
-# IAML Intelligent Autonomous Machine Learning<br />
-"I Am Machine Learning"<br /><br />
-project codename = codephreak<br />
-project direction = automind <a href="https://github.com/automindx">automindx</a><br /><br />
-"Professor Codephreak is an expert in machine learning, computer science and computer programming ..."<br />
-uiux.py provides Gradio output to local server for local language model interaction<br />
-Gradio interacts with html javascript and css <a href="https://www.gradio.app/guides/custom-CSS-and-JS">custom Gradio</a><br />
-<a href="https://www.gradio.app/guides/getting-started-with-the-js-client">Gradio Javascript Client</a><br />
-Documentation: codephreak = uiux.py + memory.py + automind.py + aglm.py<br />
+<div align="center">
 
-## ⚡ Quickstart — modern, actually-loads path (Ollama)
+# automindx — IAML
+
+### Intelligent Autonomous Machine Learning · *"I Am Machine Learning"*
+
+**Professor Codephreak** — an expert in machine learning, computer science, and
+secure, modular programming — as a local, persona-driven language-model
+environment. Project codename: **codephreak**.
+
+[![Loads instantly](https://img.shields.io/badge/UI-loads%20instantly-4b9)](TECHNICAL.md)
+[![Models](https://img.shields.io/badge/models-Ollama%20local%20%2B%20cloud-000)](TECHNICAL.md)
+[![Gradio](https://img.shields.io/badge/UI-Gradio-f97316)](https://gradio.app)
+[![audit](https://img.shields.io/badge/audit-AUDIT.md-blue)](AUDIT.md)
+
+</div>
+
+---
+
+## ⚡ Quickstart — the modern, actually-loads path (Ollama)
 
 The classic `uiux.py` / `hfUIUX.py` load a multi-GB model **before** the UI
-renders, so on modest hardware the window never appears. `ollama_codephreak.py`
+renders, so on modest hardware the window may never appear. `ollama_codephreak.py`
 inverts that: the model runs in the **Ollama** daemon and the Gradio UI loads
-instantly (and degrades gracefully if no model is present). It includes a live
-**token counter** (prompt + completion + tok/s) and a model picker for local and
-`:cloud` models.
+instantly (degrading gracefully when no model is present). It ships a model picker
+(local + `:cloud`), live streaming, and a **token counter** (prompt + completion +
+tok/s).
 
 ```bash
 pip install -r requirements-ollama.txt   # gradio + requests only — no torch
@@ -24,65 +33,69 @@ ollama pull qwen3:0.6b                    # small local model for modest hardwar
 python3 ollama_codephreak.py             # → http://localhost:7860
 ```
 
-> codephreak is **AGLM** — an augmentation layer, not a model. The full AGLM
-> cognitive console (Socratic, Logic, BDI, MASTERMIND, …) and an AI-SDK
-> participant UI live at **https://github.com/pythaiml/aglm**.
+> **codephreak is AGLM** — an augmentation layer, not a model. The full AGLM
+> cognitive console (Socratic, Logic, BDI, MASTERMIND, …) and an AI-SDK streaming
+> participant UI live at **[GATERAGE/aglm](https://github.com/GATERAGE/aglm)**.
 
-**Architecture:** see [TECHNICAL.md](TECHNICAL.md) for the module map, entrypoints,
-and the Ollama path.
+📖 **[TECHNICAL.md](TECHNICAL.md)** — module map & entrypoints &nbsp;·&nbsp;
+🔧 **[AUDIT.md](AUDIT.md)** — audit findings & fixes
 
-**Recent audit & fixes:** see [AUDIT.md](AUDIT.md) for the bugs found and fixed in
-this pass (missing `import os` in `hfapp.py`, a non-existent `app.py` Docker
-entrypoint, a duplicated/incomplete `memory.py`, signature mismatches in
-`hfUIUX.py`, and an invalid CUDA-only kwarg in `aglm.py`).
+---
 
-# User Interface and Interaction (uiux.py)<br />
+## Entrypoints
 
-(uiux.py) provides a user interface using the Gradio library to facilitate user interaction.
-This chatbot interface takes the user input, processes it, generating response includingc onversation memory handling storing and managing user instructions and model responses. The result is a local language model prompted to run as "Professor Codephreak is an expert in computer programming ....." that refers to itself as "codephreak"
-Contextual Conversation Management<br />
+| Path | File | Loads | Requires |
+|---|---|---|---|
+| **Modern (recommended)** | `ollama_codephreak.py` | **instantly** | a running Ollama daemon |
+| Legacy GGML (CPU) | `hfapp.py` | after model download | `llama-cpp-python` + ~4 GB model |
+| Legacy transformers | `uiux.py` / `hfUIUX.py` | after model load | `torch` + `transformers` |
 
-(automind.py) provides the mechanism to format and managing conversation history using the format_to_llama_chat_style function.
-(automind.py) creates coherent conversation context integrating memory management and with chatbot behavior.
-Handling different model types and initialization is based on model name calling the model from the models folder. <br />
+## Modules
 
-(memory.py) handles Conversation Memory Management by  creating a class DialogEntry to represent individual conversation dialog entries.
-A function save_conversation_memory is called to save conversation history as JSON files. Memory is created by storing user instructions and model responses in memory files for context management as .json outputs with a timestamp.<br />
+> Documentation: **codephreak = `uiux.py` + `memory.py` + `automind.py` + `aglm.py`**
 
-# LLAMA Model Interaction<br />
-(aglm.py)<br />
+| Module | Responsibility |
+|---|---|
+| `uiux.py` | Gradio interface: captures input, streams the model's response, manages memory. |
+| `automind.py` | The codephreak persona and `format_to_llama_chat_style` — renders history into Llama-2 chat format. |
+| `memory.py` | Conversation memory — saves, loads, and exports `./memory/*.json` (`instruction` / `response`). |
+| `aglm.py` | `LlamaModel` — loads a local dir **or** a Hugging Face id (`device_map="auto"`) and generates. |
+| `ollama_codephreak.py` | Modern Ollama-backed chat with model picker + token counter. |
 
-Initializes the LLAMA language model and tokenizer based on the specified models_folder models handling processing and tokenization of conversation context using the LLAMA model then generating contextually relevant responses using the LLAMA model. AUTOMIND uses a LLAMA language model to generate responses based on user instructions and conversation history. (uiux.py) encompasses user interface design, memory management, context handling, and interaction with the language model to create a conversational experience for users.<br />
+---
 
------------------------------------
+## Install
 
-## [automindx.install](https://github.com/pythaiml/automindx/blob/main/automindx.install)
-
-
-To install right click "Save link as ..." [automindx.install](https://github.com/pythaiml/automindx/blob/main/automindx.install)
- chmod +x automind.install && automind.install
-
-details and verbose procedure<br />
-instructions tested on Ubuntu 22.04 Linux Mint 21.2 and Mandrake Linux 
-1. Right-click the following link: [automindx.install](https://github.com/pythaiml/automindx/blob/main/automindx.install)
-
-2. Choose "Save link as..." or "Download linked file" from the context menu.
-3. Select a location on your computer to save the file.
-4. from the terminal
-5. chmod +x automind.install && ./automind.install<br />
-
----------------------------------
-<br />
-
-# RUN <a href="https://github.com/Professor-Codephreak">Professor Codephreak</a> with a desire to create automindx<br />
-auto-downloads model llama2-7b-chat-codeCherryPop-qLoRA-GGML<br />
-creates <b>Professor Codephreak</b> an expert in computer science, machine learning and computer programming<br />
-prompt includes an agenda to create the automindx deployment environment</b><br />
-note: This repo is under development<br />
-inputs larger than 4096 characters will crash the input --> response screen<br />
+The [`automindx.install`](https://github.com/pythaiml/automindx/blob/main/automindx.install)
+script sets up the full environment (tested on Ubuntu 22.04, Linux Mint 21.2, and
+Mandrake Linux):
 
 ```bash
-python3 uiux.py --model_name="TheBloke/llama2-7b-chat-codeCherryPop-qLoRA-GGML" --tokenizer_name="TheBloke/llama2-7b-chat-codeCherryPop-qLoRA-GGML" --model_type="ggml" --save_history --file_name="llama-2-7b-chat-codeCherryPop.ggmlv3.q4_1.bin"
+chmod +x automindx.install && ./automindx.install
 ```
 
+## Legacy GGML run
 
+Auto-downloads `llama2-7b-chat-codeCherryPop-qLoRA-GGML` and launches Professor
+Codephreak with an agenda to build the automindx deployment environment.
+
+```bash
+python3 uiux.py \
+  --model_name="TheBloke/llama2-7b-chat-codeCherryPop-qLoRA-GGML" \
+  --model_type="ggml" \
+  --file_name="llama-2-7b-chat-codeCherryPop.ggmlv3.q4_1.bin" \
+  --save_history
+```
+
+> **Note.** The legacy paths load the model in-process; inputs larger than 4096
+> characters can crash the original GGML model. Prefer `ollama_codephreak.py`.
+
+---
+
+## Links
+
+- **Professor Codephreak** — <https://github.com/Professor-Codephreak>
+- **aGLM** (augmentation layer + consoles) — <https://github.com/GATERAGE/aglm>
+- Original codephreak (historical) — <https://github.com/Professor-Codephreak/automind>
+
+*This repo is under active development.*
