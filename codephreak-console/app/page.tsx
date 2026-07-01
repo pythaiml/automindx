@@ -240,7 +240,7 @@ export default function Console() {
   const sub = PERSONA_SUBSTRATE[sagi ? 'savante' : activePersona] || PERSONA_SUBSTRATE.codephreak;
   return (
     <>
-    <Substrate a={sub.a} b={sub.b} seed={sub.seed} flux={busy || sagiRunning ? 1 : 0} />
+    <Substrate a={sub.a} b={sub.b} seed={sub.seed} flux={sagiRunning ? 0.85 : status === 'submitted' ? 0.4 : status === 'streaming' ? 0.7 : 0} />
     <div className="app">
       <aside className="side">
         <div className="brand">
