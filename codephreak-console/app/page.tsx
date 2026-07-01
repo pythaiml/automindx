@@ -17,6 +17,7 @@ import dynamic from 'next/dynamic';
 
 // xterm.js is client-only — load the interactive terminal popup without SSR.
 const ClaudeTerminal = dynamic(() => import('./ClaudeTerminal'), { ssr: false });
+import type { TermCtl } from './ClaudeTerminal';
 
 const BUILTIN_IDS = new Set(BUILTIN_PERSONAS.map((p) => p.id));
 const SAVANTE_PROMPT = BUILTIN_PERSONAS.find((p) => p.id === 'savante')?.prompt || '';
@@ -86,7 +87,10 @@ export default function Console() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const activeSession = useRef<string | null>(null);
   const [showTerm, setShowTerm] = useState(false);      // Claude terminal popup
-  const termSendRef = useRef<((s: string) => void) | null>(null);
+  const termCtlRef = useRef<TermCtl | null>(null);
+  const [sagiModel, setSagiModel] = useState<'claude-cli' | 'gpt-oss'>(() => { try { return (localStorage.getItem('cpk.sagiModel') as any) || 'claude-cli'; } catch { return 'claude-cli'; } });
+  useEffect(() => { try { localStorage.setItem('cpk.sagiModel', sagiModel); } catch { /* ignore */ } }, [sagiModel]);
+  const [sagiNote, setSagiNote] = useState<string | null>(null);
   const [sagiChooser, setSagiChooser] = useState(false); // "how many interactions?" prompt
   const [sagiSteps, setSagiSteps] = useState(() => { try { return Math.min(1024, Math.max(2, Number(localStorage.getItem('cpk.sagiSteps')) || 16)); } catch { return 16; } });
   const SAGI_ITERS = [2, 4, 8, 16, 32, 64, 128, 1024];   // ^2 powers
@@ -95,15 +99,38 @@ export default function Console() {
   useEffect(() => { try { localStorage.setItem('cpk.sagiSteps', String(sagiSteps)); } catch { /* ignore */ } }, [sagiSteps]);
   const [sagiGoal, setSagiGoal] = useState('');
   const shq = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'";   // safe single-quote for the shell
-  const launchSagi = (mode: 'steps' | 'auto' | 'plan' | 'goal') => {
+  const composeSagiPrompt = (goal: string, steps: number) => {
+    const g = goal || 'expand sAGI';
+    return `/plan ultracode — produce an exhaustive, dependency-ordered plan of exactly ${steps} build step${steps === 1 ? '' : 's'} toward the goal, grounded in the existing sagi/ package (one input→response per step, one module scaffolded into sagi/modules/ per step). For each step give: the module path, its purpose, its public API, and which sub-goal it advances; separate proof from conjecture. Do NOT build yet — output only the plan, then stop for approval.\n\n/goal ${g}`;
+  };
+  const launchSagi = async (mode: 'steps' | 'auto' | 'plan' | 'goal' | 'claude-interactive') => {
     const g = sagiGoal.trim();
     const goalArg = g ? ` --goal ${shq(g)}` : '';
+    // ── PRIMARY: drive interactive claude directly (start → wait → inject) ──
+    if (mode === 'claude-interactive') {
+      setSagiChooser(false); setSagiNote(null);
+      if (sagiModel !== 'claude-cli') { setSagiNote('Interactive Claude requires the Claude (CLI) model — switch the model selector, or use ⚙ build via sagi_build.py.'); return; }
+      const ctl = termCtlRef.current;
+      if (!ctl) { setShowTerm(true); setSagiNote('Opening the ⌘ Terminal — click ▶ again once it connects.'); return; }
+      ctl.restore();
+      const r = await ctl.claudeInteractive(composeSagiPrompt(g, sagiSteps), { goal: g });
+      if (r === 'login-required') {
+        setShowTerm(true);
+        ctl.note('\x1b[38;5;214m⚠ claude is not signed in — complete the browser sign-in (or run /login), then click ▶ again.\x1b[0m');
+        setSagiNote('Claude is not signed in — finish the sign-in shown in the terminal, then click ▶ build with Claude (interactive) again.');
+      } else if (r === 'timeout') {
+        setSagiNote('Claude took a while to signal ready — injected the prompt anyway; verify in the terminal.');
+      }
+      return;
+    }
+    // ── SECONDARY: headless sagi_build.py path, backend from the model selector ──
+    const backend = sagiModel === 'gpt-oss' ? 'ollama --model gpt-oss:120b-cloud' : 'claude-cli';
     let cmd: string;
-    if (mode === 'auto') cmd = `python3 sagi_build.py --backend claude-cli --loop --steps 99${goalArg}\r`;
+    if (mode === 'auto') cmd = `python3 sagi_build.py --backend ${backend} --loop --steps 99${goalArg}\r`;
     else if (mode === 'plan') cmd = `claude -p ${shq('ultracode — produce an exhaustive, ordered plan of the sAGI modules required to achieve this goal, grounded in the sagi/ package. Do NOT build; output only the plan. Goal: ' + (g || 'expand sAGI'))}\r`;
     else if (mode === 'goal') cmd = `python3 sagi_build.py --set-goal ${shq(g)}\r`;
-    else cmd = `python3 sagi_build.py --backend claude-cli --steps ${sagiSteps}${goalArg}\r`;
-    if (termSendRef.current) termSendRef.current(cmd);
+    else cmd = `python3 sagi_build.py --backend ${backend} --steps ${sagiSteps}${goalArg}\r`;
+    termCtlRef.current?.send(cmd);
     setSagiChooser(false);
   };
   const [savingPt, setSavingPt] = useState(false);
@@ -336,7 +363,7 @@ export default function Console() {
   return (
     <>
     <Substrate a={sub.a} b={sub.b} seed={sub.seed} flux={sagiRunning ? 0.85 : status === 'submitted' ? 0.4 : status === 'streaming' ? 0.7 : 0} />
-    {showTerm && <ClaudeTerminal onClose={() => setShowTerm(false)} onStartSagi={() => { setTab('sagi'); setSagiChooser(true); }} onReady={(send) => { termSendRef.current = send; }} />}
+    {showTerm && <ClaudeTerminal onClose={() => setShowTerm(false)} onStartSagi={() => { setTab('sagi'); setSagiChooser(true); }} onReady={(ctl) => { termCtlRef.current = ctl; }} />}
     {sagiChooser && (
       <div className="chooser-overlay" onMouseDown={() => setSagiChooser(false)}>
         <div className="chooser" onMouseDown={(e) => e.stopPropagation()}>
@@ -351,16 +378,25 @@ export default function Console() {
             {SAGI_ITERS.map((n) => <button key={n} className={'btn sm' + (sagiSteps === n ? ' primary' : ' ghost')} onClick={() => setSagiSteps(n)}>{n}</button>)}
           </div>
           <input className="chooser-goal" placeholder="Goal (optional) — what should sAGI build toward?" value={sagiGoal} onChange={(e) => setSagiGoal(e.target.value)} />
-          <div className="chooser-actions">
-            <button className="btn primary" onClick={() => launchSagi('steps')}>▶ Build {sagiSteps.toLocaleString()} {sagiSteps === 1 ? 'goal' : 'goals'}</button>
+          <div className="chooser-actions" style={{ marginBottom: 8 }}>
+            <label className="dim small">model</label>
+            <select value={sagiModel} onChange={(e) => setSagiModel(e.target.value as 'claude-cli' | 'gpt-oss')} title="which model builds sAGI">
+              <option value="claude-cli">Claude (CLI) — interactive</option>
+              <option value="gpt-oss">gpt-oss (local / Ollama)</option>
+            </select>
           </div>
           <div className="chooser-actions">
+            <button className="btn primary" disabled={sagiModel !== 'claude-cli'} onClick={() => launchSagi('claude-interactive')} title="start interactive claude, wait until ready, then inject the /goal + /plan ultracode prompt and submit">▶ build with Claude (interactive)</button>
+          </div>
+          <div className="chooser-actions">
+            <button className="btn ghost sm" onClick={() => launchSagi('steps')} title="python3 sagi_build.py — headless build with the selected model">⚙ build {sagiSteps.toLocaleString()} via sagi_build.py</button>
             <button className="btn ghost sm" onClick={() => launchSagi('plan')} title="ask Claude for an ultracode plan first — no build">⌖ /plan ultracode</button>
             <button className="btn ghost sm" onClick={() => launchSagi('goal')} disabled={!sagiGoal.trim()} title="set this as sAGI's standing goal (persists to sagi/goal.txt)">◎ /goal</button>
-            <button className="btn ghost sm" onClick={() => launchSagi('auto')} title="unbounded continuous self-build until you Ctrl-C in the terminal">∞ autonomous</button>
+            <button className="btn ghost sm" onClick={() => launchSagi('auto')} title="unbounded continuous self-build">∞ autonomous</button>
             <button className="btn ghost sm" onClick={() => setSagiChooser(false)}>Cancel</button>
           </div>
-          <p className="dim small" style={{ marginTop: 4 }}>Runs in the ⌘ Terminal (needs <span className="mono">claude</span> signed in). Watch it grow below.</p>
+          {sagiNote && <p className="dim small" role="status" style={{ color: 'var(--gold)' }}>{sagiNote}</p>}
+          <p className="dim small" style={{ marginTop: 4 }}>▶ starts interactive <span className="mono">claude</span>, waits for its input box, then types the plan. If not signed in, complete the browser sign-in, then click ▶ again.</p>
         </div>
       </div>
     )}

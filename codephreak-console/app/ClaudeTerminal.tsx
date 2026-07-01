@@ -9,10 +9,21 @@ import '@xterm/xterm/css/xterm.css';
 const PTY_PORT = 3101;
 type Mode = 'normal' | 'min' | 'max';
 
-export default function ClaudeTerminal({ onClose, onStartSagi, onReady }: { onClose: () => void; onStartSagi?: () => void; onReady?: (send: (s: string) => void) => void }) {
+// Controller the sAGI chooser uses to drive the terminal — including starting
+// interactive `claude`, waiting until it is ready, and injecting a prompt.
+export type TermCtl = {
+  send: (s: string) => void;                       // raw byte write to the PTY
+  restore: () => void;                             // un-minimize so a live TUI is visible
+  note: (line: string) => void;                    // write a status line into xterm
+  claudeInteractive: (prompt: string, opts?: { goal?: string; quietMs?: number; timeoutMs?: number }) => Promise<'ready' | 'timeout' | 'login-required'>;
+};
+
+export default function ClaudeTerminal({ onClose, onStartSagi, onReady }: { onClose: () => void; onStartSagi?: () => void; onReady?: (ctl: TermCtl) => void }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const refitRef = useRef<() => void>(() => {});
   const sendRef = useRef<(s: string) => void>(() => {});
+  const outBufRef = useRef('');        // rolling ANSI-inclusive tail of PTY output
+  const lastByteAtRef = useRef(0);     // ms timestamp of last received byte (quiescence)
   const [mode, setMode] = useState<Mode>('normal');
   const [pos, setPos] = useState(() => ({ x: Math.max(16, (window.innerWidth - 900) / 2), y: 72 }));
   const [size, setSize] = useState(() => ({ w: Math.min(900, window.innerWidth * 0.92), h: Math.min(540, window.innerHeight * 0.74) }));
@@ -48,11 +59,58 @@ export default function ClaudeTerminal({ onClose, onStartSagi, onReady }: { onCl
         term.writeln('\x1b[38;5;245m  or click the \x1b[1;38;5;42m●\x1b[0;38;5;245m green light to start Claude + let sAGI drive the build.\x1b[0m\r\n');
         refit();
       };
-      ws.onmessage = (e) => term.write(typeof e.data === 'string' ? e.data : new Uint8Array(e.data as ArrayBuffer));
+      ws.onmessage = (e) => {
+        const s = typeof e.data === 'string' ? e.data : new TextDecoder().decode(new Uint8Array(e.data as ArrayBuffer));
+        term.write(s);                                    // display fidelity (unchanged)
+        outBufRef.current = (outBufRef.current + s).slice(-8192);   // last ~8KB, scannable
+        lastByteAtRef.current = Date.now();
+      };
       ws.onclose = () => term.writeln('\r\n\x1b[38;5;203m[terminal server not connected — start it: node codephreak-console/pty-server.js]\x1b[0m');
       term.onData((d) => ws.readyState === 1 && ws.send(d));
       sendRef.current = (s: string) => { if (ws.readyState === 1) { ws.send(s); term.focus(); } };
-      onReady?.(sendRef.current);   // let the sAGI chooser send commands to this PTY
+
+      // ── interactive-claude driver: start claude → wait for ready → inject prompt ──
+      const stripAnsi = (x: string) => x.replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, '').replace(/\x1b\][^\x07]*\x07/g, '');
+      const READY_RE = /(Type \/ for commands|for shortcuts|╭─{3,}|┌─{3,}|╰─{3,}|│\s*>|❯|\bclaude \(claude-)/i;
+      const LOGIN_RE = /(\/login\b|Select login method|Sign in|Log in with|OAuth|console\.anthropic\.com|https?:\/\/[^\s]*(claude\.ai|anthropic\.com)\/(oauth|login)|Opening browser|Browser did ?n'?t open|Paste (the )?code|Invalid API key|not (?:logged in|authenticated))/i;
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const typeLine = async (text: string) => {
+        if (ws.readyState !== 1) return;
+        ws.send(text); await sleep(150);                  // raw UTF-8 paste, let the box register
+        if (ws.readyState === 1) ws.send('\r');           // submit
+      };
+      const claudeInteractive: TermCtl['claudeInteractive'] = (prompt, opts = {}) =>
+        new Promise(async (resolve) => {
+          const quietMs = opts.quietMs ?? 700, timeoutMs = opts.timeoutMs ?? 15000;
+          if (ws.readyState !== 1) { resolve('timeout'); return; }
+          outBufRef.current = '';
+          const start = Date.now();
+          ws.send('claude\r');                            // (1) launch interactive claude
+          lastByteAtRef.current = Date.now();
+          const outcome: 'ready' | 'timeout' | 'login-required' = await new Promise((res) => {
+            const iv = setInterval(() => {                // (2) readiness watch
+              const clean = stripAnsi(outBufRef.current);
+              const quiet = Date.now() - lastByteAtRef.current >= quietMs;
+              const ready = READY_RE.test(clean), login = LOGIN_RE.test(clean);
+              const elapsed = Date.now() - start;
+              if (ready && quiet) { clearInterval(iv); res('ready'); }
+              else if (login && !ready && elapsed > 3000) { clearInterval(iv); res('login-required'); }
+              else if (elapsed > timeoutMs) { clearInterval(iv); res(login ? 'login-required' : 'timeout'); }
+            }, 120);
+          });
+          if (outcome === 'login-required') { resolve('login-required'); return; }  // never inject blind
+          await sleep(200);                               // (3) staged injection
+          if (opts.goal) { await typeLine(`/goal ${opts.goal}`); await sleep(600); }
+          await typeLine(prompt);
+          resolve(outcome);
+        });
+
+      onReady?.({
+        send: sendRef.current,
+        restore: () => setMode('normal'),
+        note: (line: string) => term.writeln('\r\n' + line),
+        claudeInteractive,
+      });
 
       const ro = new ResizeObserver(() => refit());
       ro.observe(hostRef.current);
