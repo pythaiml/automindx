@@ -66,6 +66,75 @@ one at a time.
 ./scripts/run_codephreak_console.sh      # engine :5001 + console :3100
 ```
 
+---
+
+## Using automindX
+
+### 1. The console (recommended)
+
+**Prerequisites:** [Ollama](https://ollama.com) and Node.js 18+.
+
+```bash
+ollama serve                     # start the model daemon (another terminal)
+ollama pull qwen3:0.6b           # a small local model for testing (optional)
+./scripts/run_codephreak_console.sh
+```
+
+Open **http://localhost:3100**. Then:
+
+- **Chat** — type a message and press **Enter**. Responses stream live, with a
+  collapsible reasoning trace, a live token / tok-s counter, and a substrate that
+  gently pulses while codephreak thinks.
+- **Pick a model** (top bar) — local models, or free `:cloud` models
+  (`gpt-oss:120b-cloud` is the default). Gated models show a sign-in link;
+  Autonomous mode auto-pulls a model you select but haven't installed.
+- **Ask about the actual code** — codephreak can read the real project files, so
+  *“list all project files”*, *“read services/model_service.py”*, or *“audit the
+  console for security issues”* return grounded answers (it shows the tool calls
+  in the reasoning stream). Big tasks are auto-split into sub-tasks.
+- **`.persona`** — switch or edit personas (Professor Codephreak, automindX,
+  jAImla, Savante, Sentinel, Architect, Mentor) or create your own; the edited
+  prompt *is* what's sent.
+- **Advanced / Scientific** — tune sampling (temperature, top-p/k, mirostat,
+  num_ctx, …). **Preferences** — avatar, name, accent colour. **.history** —
+  reopen / export / delete past chats.
+- **❤ / 👍 / 👎 / 💔** — rate replies; `codephreak.py` learns directives from your
+  feedback and folds them into the persona over time.
+- **sAGI** (Preferences → toggle) — opens a tab where a self-building sAGI grows
+  one module at a time into the `sagi/` package.
+
+### 2. From Python (the service layer)
+
+```python
+from automind import chat
+print(chat("Write a production-ready Python rate limiter."))   # one-shot
+sid = None
+out = chat("Remember my name is Ada.", full=True); sid = out["session_id"]
+print(chat("What's my name?", session_id=sid))                 # continues with memory
+```
+
+Memory persists to SQLite by default (set `AUTOMINDX_MEMORY_BACKEND=pgvector` for
+RAGE semantic memory). See **[docs/SERVICES.md](docs/SERVICES.md)**.
+
+### 3. Command line
+
+```bash
+python3 -m services.inference_orchestrator      # interactive REPL
+python3 -m services.self_audit                  # codephreak audits the real code
+python3 -m services.self_audit --file services/model_service.py
+python3 codephreak.py                           # self-improving engine (:5001, /healthz)
+python3 sagi_build.py --steps 3                 # headless sAGI self-build
+```
+
+### 4. Gradio (no Node)
+
+```bash
+pip install -r requirements-ollama.txt && python3 ollama_codephreak.py   # → :7860
+```
+
+Config is env-driven (`OLLAMA_HOST`, `AUTOMINDX_MODEL`, `CODEPHREAK_MODEL`,
+`AUTOMINDX_MEMORY_BACKEND`, …) — see [docs/SERVICES.md](docs/SERVICES.md).
+
 ## Modules
 
 > Documentation: **codephreak = `uiux.py` + `memory.py` + `automind.py` + `aglm.py`**
