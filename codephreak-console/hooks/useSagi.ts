@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 
 export type SagiModule = { step: number; title: string; body: string };
 
+const ATARAXIA_PATIENCE = 3;   // consecutive no-new steps → converged (perfection = Ataraxia)
+
 type Opts = {
   collectChat: (system: string, userText: string) => Promise<string>;
   savante: string;       // Savante persona prompt
@@ -18,6 +20,7 @@ type Opts = {
 export function useSagi({ collectChat, savante, directive, autonomous, sagi, maxSteps = 16, target }: Opts) {
   const targetRef = useRef(target ?? maxSteps); targetRef.current = target ?? maxSteps;
   const [running, setRunning] = useState(false);
+  const [ataraxia, setAtaraxia] = useState<string | null>(null);   // set when the breaker trips
   const [log, setLog] = useState<SagiModule[]>([]);
   const [disk, setDisk] = useState<{ count: number; last?: string; modules?: { step: number; title: string; ts: number }[] }>({ count: 0 });
   const stop = useRef(false);
@@ -56,17 +59,25 @@ export function useSagi({ collectChat, savante, directive, autonomous, sagi, max
     return title;
   }
 
+  const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   async function runLoop() {
     if (running) return;
-    setRunning(true); stop.current = false;
+    setRunning(true); stop.current = false; setAtaraxia(null);
     const titles = log.map((s) => s.title);
+    const seen = new Set(titles.map(norm));
+    let calm = 0;                               // consecutive no-new (redundant) steps
     while (!stop.current && autoRef.current && titles.length < Math.min(maxSteps, targetRef.current)) {
-      titles.push(await buildStep(undefined, titles.join('; ')));
+      const title = await buildStep(undefined, titles.join('; '));
+      titles.push(title);
+      const n = norm(title);
+      // Ataraxia circuit breaker: perfection is Ataraxia — stop once converged.
+      if (seen.has(n)) { calm += 1; if (calm >= ATARAXIA_PATIENCE) { setAtaraxia('done'); break; } }
+      else { calm = 0; seen.add(n); }
       await new Promise((r) => setTimeout(r, 600));
     }
     setRunning(false);
   }
   function stopLoop() { stop.current = true; setRunning(false); }
 
-  return { running, log, setLog, disk, loadDisk, buildStep, runLoop, stopLoop, maxSteps };
+  return { running, log, setLog, disk, loadDisk, buildStep, runLoop, stopLoop, maxSteps, ataraxia };
 }
