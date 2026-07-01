@@ -65,5 +65,9 @@ beliefs.
 - **[mindX](https://github.com/agenticplace)** — the production consumer these primitives were distilled from · docs: **[mindx.pythai.net/docs.html](https://mindx.pythai.net/docs.html)**
 
 For more information on the autonomous-learning-loop patterns aGLM distills, see
-**<https://mindx.pythai.net/docs.html>**. The public broadcast layer — all
-"public noise" — is at **<https://rage.pythai.net>**.
+**<https://mindx.pythai.net/docs.html>**.
+
+The public broadcast layer — "public noise" — is **<https://rage.pythai.net>**,
+where mindX publishes in the voice of mindX via its **AuthorAgent** (Professor
+Codephreak has published there occasionally). aGLM's reasoning faculties —
+**Socratic reasoning** and **logic tables** — are documented there.
