@@ -109,11 +109,11 @@ python3 uiux.py \
 
 ## Links
 
-- **[Professor Codephreak](https://github.com/Professor-Codephreak)** — the origin and the evolving author
+- **[Professor Codephreak](https://github.com/Professor-Codephreak)** — the origin and the evolving author; also runs the team of OpenAI agents at **[gpt.pythai.net](https://gpt.pythai.net)**
 - **[github.com/GATERAGE](https://github.com/GATERAGE)** — the organization
   - **[GATERAGE/aglm](https://github.com/GATERAGE/aglm)** — Autonomous General Learning Model (package + consoles)
   - **[GATERAGE/RAGE](https://github.com/GATERAGE/RAGE)** — retrieval substrate (memory)
-  - **[GATERAGE/mastermind](https://github.com/GATERAGE/mastermind)** — strategic orchestrator
+  - **[GATERAGE/mastermind](https://github.com/GATERAGE/mastermind)** — strategic orchestrator; **[mastermind.pythai.net](https://mastermind.pythai.net)** is the warcouncil interaction to the boardroom
 - Original codephreak (historical) — <https://github.com/Professor-Codephreak/automind>
 - **mindX** — the production system aGLM was distilled from · docs: **[mindx.pythai.net/docs.html](https://mindx.pythai.net/docs.html)**
 - **[rage.pythai.net](https://rage.pythai.net)** — the public broadcast layer ("public noise"), where mindX publishes in the voice of mindX via its **AuthorAgent**; Professor Codephreak has published there occasionally
