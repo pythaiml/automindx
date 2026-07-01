@@ -30,10 +30,25 @@ cd codephreak-console && npm install && npm run dev     # console :3100
 - **Scientific** sampling (Ollama-native, genuinely applied via `/api/chat`):
   mirostat 0/1/2, τ, η, tail-free z, typical-p, min-p, repeat-last-n, num_ctx,
   and stop sequences.
-- **`.persona` creator** — seven built-in personas in the codephreak pattern
-  (**Professor Codephreak**, **automindX** the automaton, **jAImla** the ML agent,
-  **Savante** sAGI, **Sentinel**, **Architect**, **Mentor**) plus your own. The
-  persona you edit **is** the exact system prompt sent — perfect symmetry.
+- **Expandable `.persona` creator** — eight built-in personas in the codephreak
+  pattern (**Professor Codephreak**, **automindX**, **jAImla**, **Savante** · sAGI,
+  **sAGI · individual expansion**, **Sentinel**, **Architect**, **Mentor**) plus your
+  own. Each is a **base template + an individuality layer on top**; personas carry
+  **avatars** (Savante & sAGI ship art). The composed text **is** the exact system
+  prompt sent — perfect symmetry.
+- **Filesystem access** — codephreak reads the ACTUAL project via tool-calling
+  (`list_files`/`read_file`/`grep`), and **decomposes large tasks into sub-tasks**
+  when it hits the tool-call limit.
+- **⌘ Terminal** — a real interactive PTY terminal (drag/resize/min-max); type
+  `claude` to sign in with your subscription and drive Claude Code on the dapp. The
+  green light launches a Claude-driven **sAGI build** (steps / autonomous / `/goal` /
+  `/plan ultracode`).
+- **sAGI tab** — a living **constellation** of built modules, an **evolving WebGL**
+  field (Fibonacci→golden-ratio; triangle→circle→square→random), a live **`.history`**
+  log, and a **sensorium** (oscilloscope mouth + local TTS · mic ears · camera/webcam
+  eyes). Memory grows as a **gitmind** tree saved into RAGE — see [savethetrees.md](savethetrees.md).
+- **Living WebGL substrate** behind everything, per-persona, that **fluxes while
+  thinking**; **❤ / 👍 / 👎 / 💔** feedback teaches `codephreak.py`.
 - **`.history`** — local sessions: reopen, export (`.md` / `.json`), copy, delete.
 - **Export & copy** anywhere; **regenerate** and **stop** on the last turn.
 - **3D-depth UI** — layered elevation shadows, glassmorphism, and beveled controls.
