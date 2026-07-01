@@ -8,7 +8,7 @@
 import gradio as gr
 from automind import format_to_llama_chat_style, DEFAULT_SYSTEM_PROMPT
 from memory import save_conversation_memory
-from aglm import LlamaModel
+from llama_model import LlamaModel
 from context4096 import ContextWindow
 
 MODEL_ID = "microsoft/phi-2"

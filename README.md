@@ -70,8 +70,10 @@ a self-improving feedback loop (`codephreak.py`).
 | `uiux.py` | Gradio interface: captures input, streams the model's response, manages memory. |
 | `automind.py` | The codephreak persona and `format_to_llama_chat_style` — renders history into Llama-2 chat format. |
 | `memory.py` | Conversation memory — saves, loads, and exports `./memory/*.json` (`instruction` / `response`). |
-| `aglm.py` | `LlamaModel` — loads a local dir **or** a Hugging Face id (`device_map="auto"`) and generates. |
+| `llama_model.py` | `LlamaModel` — loads a local dir **or** a Hugging Face id (`device_map="auto"`) and generates. *(was `aglm.py`)* |
 | `ollama_codephreak.py` | Modern Ollama-backed chat with model picker + token counter. |
+| `aglm/` | The **Autonomous General Learning Model** package (PODA cycle · beliefs · autonomous loop), migrated from [GATERAGE/aglm](https://github.com/GATERAGE/aglm). See [AGLM.md](AGLM.md). |
+| `automind_aglm.py` | Wires aGLM to codephreak's feedback so automindX self-refines its persona. |
 
 ---
 
@@ -107,8 +109,13 @@ python3 uiux.py \
 
 ## Links
 
-- **Professor Codephreak** — <https://github.com/Professor-Codephreak>
-- **aGLM** (augmentation layer + consoles) — <https://github.com/GATERAGE/aglm>
+- **[Professor Codephreak](https://github.com/Professor-Codephreak)** — the origin and the evolving author
+- **[github.com/GATERAGE](https://github.com/GATERAGE)** — the organization
+  - **[GATERAGE/aglm](https://github.com/GATERAGE/aglm)** — Autonomous General Learning Model (package + consoles)
+  - **[GATERAGE/RAGE](https://github.com/GATERAGE/RAGE)** — retrieval substrate (memory)
+  - **[GATERAGE/mastermind](https://github.com/GATERAGE/mastermind)** — strategic orchestrator
 - Original codephreak (historical) — <https://github.com/Professor-Codephreak/automind>
 
-*This repo is under active development.*
+> **RAGE remembers · aGLM decides · MASTERMIND orchestrates.**
+
+*This repo is under active development — Professor Codephreak keeps evolving.*
