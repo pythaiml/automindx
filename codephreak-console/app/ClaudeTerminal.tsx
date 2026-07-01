@@ -15,7 +15,16 @@ export type TermCtl = {
   send: (s: string) => void;                       // raw byte write to the PTY
   restore: () => void;                             // un-minimize so a live TUI is visible
   note: (line: string) => void;                    // write a status line into xterm
-  claudeInteractive: (prompt: string, opts?: { goal?: string; quietMs?: number; timeoutMs?: number }) => Promise<'ready' | 'timeout' | 'login-required'>;
+  claudeInteractive: (
+    planPrompt: string,
+    opts?: {
+      proceed?: string;              // ultracode + /goal message sent AFTER the plan output finishes
+      quietMs?: number;              // launch-readiness quiescence window
+      timeoutMs?: number;            // launch-readiness overall timeout
+      respondQuietMs?: number;       // plan-output "gone quiet" window (response complete)
+      respondTimeoutMs?: number;     // plan-output overall fallback timeout
+    },
+  ) => Promise<'ready' | 'timeout' | 'login-required'>;
 };
 
 export default function ClaudeTerminal({ onClose, onStartSagi, onReady, onClaude }: { onClose: () => void; onStartSagi?: () => void; onReady?: (ctl: TermCtl) => void; onClaude?: () => void }) {
@@ -79,7 +88,24 @@ export default function ClaudeTerminal({ onClose, onStartSagi, onReady, onClaude
         ws.send(text); await sleep(150);                  // raw UTF-8 paste, let the box register
         if (ws.readyState === 1) ws.send('\r');           // submit
       };
-      const claudeInteractive: TermCtl['claudeInteractive'] = (prompt, opts = {}) =>
+      // Wait for Claude's response to a just-sent prompt: (a) STARTED — a byte arrived
+      // after we submitted (sinceTs); the redraw + animated spinner emit through the
+      // whole turn. (b) QUIET — no byte for ≥ quietMs (the plan stream is done).
+      const waitForResponse = async (sinceTs: number, wopts: { quietMs?: number; timeoutMs?: number } = {}): Promise<'complete' | 'timeout' | 'closed'> => {
+        const quietMs = wopts.quietMs ?? 1500;            // > mid-stream pauses
+        const timeoutMs = wopts.timeoutMs ?? 180000;      // hard cap
+        const start = Date.now();
+        let started = false;
+        for (;;) {
+          if (ws.readyState !== 1) return 'closed';
+          if (!started && lastByteAtRef.current > sinceTs) started = true;   // (a) output began
+          const quiet = Date.now() - lastByteAtRef.current >= quietMs;       // (b) output finished
+          if (started && quiet) return 'complete';
+          if (Date.now() - start >= timeoutMs) return started ? 'complete' : 'timeout';
+          await sleep(120);
+        }
+      };
+      const claudeInteractive: TermCtl['claudeInteractive'] = (planPrompt, opts = {}) =>
         new Promise(async (resolve) => {
           const quietMs = opts.quietMs ?? 700, timeoutMs = opts.timeoutMs ?? 15000;
           if (ws.readyState !== 1) { resolve('timeout'); return; }
@@ -99,9 +125,14 @@ export default function ClaudeTerminal({ onClose, onStartSagi, onReady, onClaude
             }, 120);
           });
           if (outcome === 'login-required') { resolve('login-required'); return; }  // never inject blind
-          await sleep(200);                               // (3) staged injection
-          if (opts.goal) { await typeLine(`/goal ${opts.goal}`); await sleep(600); }
-          await typeLine(prompt);
+          await sleep(200);
+          // ── STAGE 1: send the /plan message ALONE ──
+          await typeLine(planPrompt);
+          const planSentAt = Date.now();
+          // ── STAGE 2: WAIT for the plan output to START then go QUIET (plan finished) ──
+          await waitForResponse(planSentAt, { quietMs: opts.respondQuietMs ?? 1500, timeoutMs: opts.respondTimeoutMs ?? 180000 });
+          // ── STAGE 3: send the ultracode + /goal proceed message ──
+          if (opts.proceed) { await sleep(300); await typeLine(opts.proceed); }
           resolve(outcome);
         });
 
