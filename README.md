@@ -116,6 +116,7 @@ python3 uiux.py \
   - **[GATERAGE/mastermind](https://github.com/GATERAGE/mastermind)** — strategic orchestrator
 - Original codephreak (historical) — <https://github.com/Professor-Codephreak/automind>
 - **mindX** — the production system aGLM was distilled from · docs: **[mindx.pythai.net/docs.html](https://mindx.pythai.net/docs.html)**
+- **[rage.pythai.net](https://rage.pythai.net)** — the public broadcast layer (all "public noise")
 
 > **RAGE remembers · aGLM decides · MASTERMIND orchestrates.**
 
