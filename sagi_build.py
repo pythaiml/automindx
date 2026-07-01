@@ -38,6 +38,19 @@ import requests
 SAGI_DIR = os.environ.get("SAGI_DIR", os.path.join(os.path.dirname(__file__), "sagi"))
 MODULES_DIR = os.path.join(SAGI_DIR, "modules")
 MANIFEST = os.path.join(SAGI_DIR, "manifest.json")
+# sAGI is a read-write sandbox layer that morphs from Savante; every run and every
+# module it grows is appended to .history so the whole self-build can be replayed.
+HISTORY_DIR = os.path.join(SAGI_DIR, ".history")
+HISTORY_LOG = os.path.join(HISTORY_DIR, "build.jsonl")
+
+
+def log_history(event: dict) -> None:
+    try:
+        os.makedirs(HISTORY_DIR, exist_ok=True)
+        with open(HISTORY_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"ts": int(time.time()), **event}) + "\n")
+    except OSError:
+        pass
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 DEFAULT_MODEL = os.environ.get("CODEPHREAK_MODEL", "gpt-oss:120b-cloud")
 # Model backend: 'ollama' (default) | 'claude-cli' (host `claude` CLI, uses your
@@ -154,18 +167,24 @@ def build_step(model: str, backend: str = None) -> dict:
     with open(MANIFEST, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
         f.write("\n")
+    log_history({"event": "module", "step": step, "title": title, "file": fname, "backend": backend or BACKEND})
     print(f"  ✓ step {step}: {title}  → sagi/modules/{fname}")
     return {"success": True, "step": step, "title": title}
 
 
 def build(model: str, steps: int, backend: str = None) -> None:
     print(f"sAGI headless build · backend={backend or BACKEND} · model={model} · {steps} step(s) → {SAGI_DIR}")
+    log_history({"event": "run_start", "backend": backend or BACKEND, "model": model, "steps": steps})
+    done = 0
     for _ in range(steps):
         try:
             build_step(model, backend)
+            done += 1
         except Exception as e:
             print(f"  ✗ step failed: {e}")
+            log_history({"event": "error", "detail": str(e)[:200]})
             break
+    log_history({"event": "run_end", "built": done})
 
 
 async def build_loop(model: str, steps: int, interval: float = 2.0, backend: str = None) -> None:

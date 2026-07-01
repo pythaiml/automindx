@@ -11,6 +11,16 @@ export const runtime = 'nodejs';
 const SAGI_DIR = process.env.SAGI_DIR || path.resolve(process.cwd(), '..', 'sagi');
 const MODULES_DIR = path.join(SAGI_DIR, 'modules');
 const MANIFEST = path.join(SAGI_DIR, 'manifest.json');
+const HISTORY_DIR = path.join(SAGI_DIR, '.history');
+const HISTORY_LOG = path.join(HISTORY_DIR, 'build.jsonl');
+
+// sAGI's read-write history: append one JSONL line per event (module/run).
+async function logHistory(event: Record<string, unknown>): Promise<void> {
+  try {
+    await fs.mkdir(HISTORY_DIR, { recursive: true });
+    await fs.appendFile(HISTORY_LOG, JSON.stringify({ ts: Math.floor(Date.now() / 1000), ...event }) + '\n', 'utf8');
+  } catch { /* history is best-effort */ }
+}
 
 async function readManifest(): Promise<any> {
   try {
@@ -51,6 +61,7 @@ export async function POST(req: Request) {
     manifest.modules.push({ step: Number(step) || manifest.modules.length + 1, title, file, ts: Date.now() });
     manifest.version = `0.0.${manifest.modules.length}`;
     await fs.writeFile(MANIFEST, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+    await logHistory({ event: 'module', step: Number(step) || manifest.modules.length, title, file, backend: 'console' });
 
     return Response.json({ ok: true, file: `sagi/modules/${file}`, count: manifest.modules.length });
   } catch (e: any) {

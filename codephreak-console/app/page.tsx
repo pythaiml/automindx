@@ -10,6 +10,7 @@ import { usePrefs } from '@/hooks/usePrefs';
 import { useModels } from '@/hooks/useModels';
 import { useSagi } from '@/hooks/useSagi';
 import Substrate from './Substrate';
+import SagiVisual from './SagiVisual';
 import dynamic from 'next/dynamic';
 
 // xterm.js is client-only — load the interactive terminal popup without SSR.
@@ -141,7 +142,34 @@ export default function Console() {
   useEffect(() => { localStorage.setItem(LS.sagi, sagi ? '1' : '0'); }, [sagi]);
   useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, status]);
   useEffect(() => { if (status === 'ready' && messages.length) saveSession(messages); /* eslint-disable-next-line */ }, [status]);
-  useEffect(() => { if (tab === 'sagi') loadSagiDisk(); /* eslint-disable-next-line */ }, [tab]);
+  // Poll sagi/ on disk while the tab is open or a build runs, so the visual watches
+  // both the in-console loop and the terminal's green-light sagi_build.py.
+  const prevSagiCount = useRef(0);
+  const [sagiGrew, setSagiGrew] = useState(false);
+  const [sagiHistory, setSagiHistory] = useState<any[]>([]);
+  const histRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (histRef.current) histRef.current.scrollTop = histRef.current.scrollHeight; }, [sagiHistory]);
+  const loadSagiHistory = async () => {
+    try { const j = await (await fetch('/api/sagi/history?limit=140')).json(); if (j.ok) setSagiHistory(j.entries); } catch {}
+  };
+  useEffect(() => {
+    if (tab !== 'sagi' && !sagiRunning) return;
+    const tick = () => { loadSagiDisk(); loadSagiHistory(); };
+    tick();
+    const iv = setInterval(tick, 1500);
+    return () => clearInterval(iv);
+    /* eslint-disable-next-line */
+  }, [tab, sagiRunning]);
+  useEffect(() => {
+    const c = sagiDisk.count || 0;
+    if (c > prevSagiCount.current && prevSagiCount.current !== 0) {
+      setSagiGrew(true);
+      const t = setTimeout(() => setSagiGrew(false), 4000);
+      prevSagiCount.current = c;
+      return () => clearTimeout(t);
+    }
+    prevSagiCount.current = c;
+  }, [sagiDisk.count]);
 
   function submit(text: string) {
     if (!text.trim() || busy) return;
@@ -246,7 +274,7 @@ export default function Console() {
   return (
     <>
     <Substrate a={sub.a} b={sub.b} seed={sub.seed} flux={sagiRunning ? 0.85 : status === 'submitted' ? 0.4 : status === 'streaming' ? 0.7 : 0} />
-    {showTerm && <ClaudeTerminal onClose={() => setShowTerm(false)} />}
+    {showTerm && <ClaudeTerminal onClose={() => setShowTerm(false)} onStartSagi={() => setTab('sagi')} />}
     <div className="app">
       <aside className="side">
         <div className="brand">
@@ -380,6 +408,20 @@ export default function Console() {
             <h1>⚛ sAGI <span className="dim small" style={{ fontWeight: 400 }}>self-building · from Savante</span></h1>
             <p className="lead">sAGI is a self-building, agnostic, modular scientific general intelligence grown from the <b>Savante</b> persona. It builds itself one module per step using the chosen model — <b className="mono">{model}</b>. Modules are scaffolded into the agnostic <span className="mono">sagi/</span> package for inclusion in any project (including as a Tauri app).</p>
             <div className="card">
+              <SagiVisual modules={sagiDisk.modules || []} building={sagiRunning || sagiGrew} />
+              {sagiHistory.length > 0 && (
+                <details className="sagi-history" open>
+                  <summary><span className="mono">.history</span> — sAGI read/write log <span className="dim small">({sagiHistory.length})</span></summary>
+                  <div className="sagi-histlog" ref={histRef}>
+                    {sagiHistory.map((e, i) => {
+                      const t = new Date((e.ts || 0) * 1000).toLocaleTimeString();
+                      const g = e.event === 'module' ? '＋' : e.event === 'run_start' ? '▶' : e.event === 'run_end' ? '■' : e.event === 'error' ? '✗' : '·';
+                      const msg = e.event === 'module' ? `step ${e.step} · ${e.title}` : e.event === 'run_start' ? `run · ${e.backend} · ${e.steps} steps` : e.event === 'run_end' ? `run end · built ${e.built}` : e.event === 'error' ? `error · ${e.detail || ''}` : e.event;
+                      return <div className={'hl hl-' + e.event} key={i}><span className="hl-t">{t}</span><span className="hl-g">{g}</span><span className="hl-m">{msg}</span></div>;
+                    })}
+                  </div>
+                </details>
+              )}
               <div className="row" style={{ marginBottom: 10 }}>
                 <span className={'badge ' + (autonomous ? 'on' : '')}>{autonomous ? 'autonomous · continuous loop' : 'manual · one step per input'}</span>
                 <span className="badge">{sagiLog.length} built this session</span>

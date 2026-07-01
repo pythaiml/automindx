@@ -17,7 +17,7 @@ type Opts = {
 export function useSagi({ collectChat, savante, directive, autonomous, sagi, maxSteps = 16 }: Opts) {
   const [running, setRunning] = useState(false);
   const [log, setLog] = useState<SagiModule[]>([]);
-  const [disk, setDisk] = useState<{ count: number; last?: string }>({ count: 0 });
+  const [disk, setDisk] = useState<{ count: number; last?: string; modules?: { step: number; title: string; ts: number }[] }>({ count: 0 });
   const stop = useRef(false);
   const autoRef = useRef(autonomous); autoRef.current = autonomous;
   const sagiRef = useRef(sagi); sagiRef.current = sagi;
@@ -26,7 +26,10 @@ export function useSagi({ collectChat, savante, directive, autonomous, sagi, max
   useEffect(() => { if (!autonomous || !sagi) stop.current = true; }, [autonomous, sagi]);
 
   async function loadDisk() {
-    try { const j = await (await fetch('/api/sagi')).json(); if (j.ok) setDisk({ count: j.count }); } catch {}
+    try {
+      const j = await (await fetch('/api/sagi')).json();
+      if (j.ok) setDisk({ count: j.count, modules: j.modules });
+    } catch {}
   }
 
   async function buildStep(operatorInput?: string, priorTitles?: string): Promise<string> {
