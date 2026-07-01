@@ -31,3 +31,6 @@ memory/*.db
 
 # sAGI read/write history (runtime log)
 sagi/.history/
+
+# sAGI standing goal (runtime)
+sagi/goal.txt

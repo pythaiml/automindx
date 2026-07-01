@@ -437,3 +437,5 @@ h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -.01em; }
 .sf-ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .sf-badge { font-size: 11px; color: var(--accent); font-family: var(--mono); }
 .sf-err { font-size: 11px; color: var(--bad); }
+.chooser-goal { width: 100%; margin-bottom: 12px; }
+.chooser-actions + .chooser-actions { margin-top: 8px; }

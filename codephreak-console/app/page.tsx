@@ -90,10 +90,16 @@ export default function Console() {
   const [sagiChooser, setSagiChooser] = useState(false); // "how many interactions?" prompt
   const [sagiSteps, setSagiSteps] = useState(() => { try { return Math.min(20, Math.max(1, Number(localStorage.getItem('cpk.sagiSteps')) || 3)); } catch { return 3; } });
   useEffect(() => { try { localStorage.setItem('cpk.sagiSteps', String(sagiSteps)); } catch { /* ignore */ } }, [sagiSteps]);
-  const launchSagi = (autonomousLoop: boolean) => {
-    const cmd = autonomousLoop
-      ? 'python3 sagi_build.py --backend claude-cli --loop --steps 99\r'   // continuous until you Ctrl-C
-      : `python3 sagi_build.py --backend claude-cli --steps ${sagiSteps}\r`;
+  const [sagiGoal, setSagiGoal] = useState('');
+  const shq = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'";   // safe single-quote for the shell
+  const launchSagi = (mode: 'steps' | 'auto' | 'plan' | 'goal') => {
+    const g = sagiGoal.trim();
+    const goalArg = g ? ` --goal ${shq(g)}` : '';
+    let cmd: string;
+    if (mode === 'auto') cmd = `python3 sagi_build.py --backend claude-cli --loop --steps 99${goalArg}\r`;
+    else if (mode === 'plan') cmd = `claude -p ${shq('ultracode — produce an exhaustive, ordered plan of the sAGI modules required to achieve this goal, grounded in the sagi/ package. Do NOT build; output only the plan. Goal: ' + (g || 'expand sAGI'))}\r`;
+    else if (mode === 'goal') cmd = `python3 sagi_build.py --set-goal ${shq(g)}\r`;
+    else cmd = `python3 sagi_build.py --backend claude-cli --steps ${sagiSteps}${goalArg}\r`;
     if (termSendRef.current) termSendRef.current(cmd);
     setSagiChooser(false);
   };
@@ -301,9 +307,14 @@ export default function Console() {
           <div className="chooser-presets">
             {[1, 3, 5, 10].map((n) => <button key={n} className={'btn sm' + (sagiSteps === n ? ' primary' : ' ghost')} onClick={() => setSagiSteps(n)}>{n}</button>)}
           </div>
+          <input className="chooser-goal" placeholder="Goal (optional) — what should sAGI build toward?" value={sagiGoal} onChange={(e) => setSagiGoal(e.target.value)} />
           <div className="chooser-actions">
-            <button className="btn primary" onClick={() => launchSagi(false)}>▶ Build {sagiSteps} step{sagiSteps > 1 ? 's' : ''}</button>
-            <button className="btn" onClick={() => launchSagi(true)} title="continuous self-build until you Ctrl-C in the terminal">∞ Autonomous</button>
+            <button className="btn primary" onClick={() => launchSagi('steps')}>▶ Build {sagiSteps} step{sagiSteps > 1 ? 's' : ''}</button>
+            <button className="btn" onClick={() => launchSagi('auto')} title="continuous self-build until you Ctrl-C in the terminal">∞ Autonomous</button>
+          </div>
+          <div className="chooser-actions">
+            <button className="btn ghost sm" onClick={() => launchSagi('plan')} title="ask Claude for an ultracode plan first — no build">⌖ /plan ultracode</button>
+            <button className="btn ghost sm" onClick={() => launchSagi('goal')} disabled={!sagiGoal.trim()} title="set this as sAGI's standing goal (persists to sagi/goal.txt)">◎ /goal</button>
             <button className="btn ghost sm" onClick={() => setSagiChooser(false)}>Cancel</button>
           </div>
           <p className="dim small" style={{ marginTop: 4 }}>Runs in the ⌘ Terminal (needs <span className="mono">claude</span> signed in). Watch it grow below.</p>
