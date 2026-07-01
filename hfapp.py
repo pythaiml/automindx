@@ -1,6 +1,7 @@
 # hfapp.py
 # Professor Codephreak ancestor=mode
 # 1 cpu + 16gb ram
+import os
 import gradio as gr
 from llama_cpp import Llama
 from huggingface_hub import hf_hub_download

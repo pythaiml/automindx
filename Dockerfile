@@ -22,5 +22,6 @@ ENV HF_HOME=/workspace/.cache/huggingface
 # Expose Gradio default port
 EXPOSE 7860
 
-# Entrypoint
-CMD ["python", "app.py"]
+# Entrypoint — hfapp.py is the self-contained GGML (llama.cpp) demo that
+# downloads its model on first run. (The previous "app.py" did not exist.)
+CMD ["python", "hfapp.py"]

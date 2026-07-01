@@ -1,0 +1,6 @@
+# Lightweight deps for ollama_codephreak.py — the modern, actually-loads path.
+# The model runs in the Ollama daemon (https://ollama.com), so no torch /
+# transformers / llama-cpp are needed here.
+gradio==3.37.0
+requests>=2.31.0
+ujson>=5.8.0

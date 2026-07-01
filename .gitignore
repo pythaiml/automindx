@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Runtime artifacts
+*.log
+memory/*.json
+
+# Models (downloaded at runtime; never commit the GGML/GGUF weights)
+models/
+*.bin
+*.gguf
+*.ggml
+
+# Env
+.env
+.env*.local
