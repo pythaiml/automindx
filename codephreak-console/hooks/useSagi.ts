@@ -10,11 +10,13 @@ type Opts = {
   autonomous: boolean;
   sagi: boolean;
   maxSteps?: number;
+  target?: number;       // how many iterations this run should build (≤ maxSteps)
 };
 
 // The sAGI self-building loop + on-disk state. Orchestrator-agnostic contract:
 // propose → specify → persist (to sagi/ via /api/sagi).
-export function useSagi({ collectChat, savante, directive, autonomous, sagi, maxSteps = 16 }: Opts) {
+export function useSagi({ collectChat, savante, directive, autonomous, sagi, maxSteps = 16, target }: Opts) {
+  const targetRef = useRef(target ?? maxSteps); targetRef.current = target ?? maxSteps;
   const [running, setRunning] = useState(false);
   const [log, setLog] = useState<SagiModule[]>([]);
   const [disk, setDisk] = useState<{ count: number; last?: string; modules?: { step: number; title: string; ts: number }[] }>({ count: 0 });
@@ -58,7 +60,7 @@ export function useSagi({ collectChat, savante, directive, autonomous, sagi, max
     if (running) return;
     setRunning(true); stop.current = false;
     const titles = log.map((s) => s.title);
-    while (!stop.current && autoRef.current && titles.length < maxSteps) {
+    while (!stop.current && autoRef.current && titles.length < Math.min(maxSteps, targetRef.current)) {
       titles.push(await buildStep(undefined, titles.join('; ')));
       await new Promise((r) => setTimeout(r, 600));
     }

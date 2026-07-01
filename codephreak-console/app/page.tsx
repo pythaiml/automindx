@@ -88,7 +88,10 @@ export default function Console() {
   const [showTerm, setShowTerm] = useState(false);      // Claude terminal popup
   const termSendRef = useRef<((s: string) => void) | null>(null);
   const [sagiChooser, setSagiChooser] = useState(false); // "how many interactions?" prompt
-  const [sagiSteps, setSagiSteps] = useState(() => { try { return Math.min(1000, Math.max(1, Number(localStorage.getItem('cpk.sagiSteps')) || 10)); } catch { return 10; } });
+  const [sagiSteps, setSagiSteps] = useState(() => { try { return Math.min(1024, Math.max(2, Number(localStorage.getItem('cpk.sagiSteps')) || 16)); } catch { return 16; } });
+  const SAGI_ITERS = [2, 4, 8, 16, 32, 64, 128, 1024];   // ^2 powers
+  const pow2Up = (s: number) => Math.min(1024, 1 << (Math.floor(Math.log2(Math.max(2, s))) + 1));
+  const pow2Down = (s: number) => Math.max(2, 1 << (Math.ceil(Math.log2(Math.max(2, s))) - 1));
   useEffect(() => { try { localStorage.setItem('cpk.sagiSteps', String(sagiSteps)); } catch { /* ignore */ } }, [sagiSteps]);
   const [sagiGoal, setSagiGoal] = useState('');
   const shq = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'";   // safe single-quote for the shell
@@ -150,7 +153,7 @@ export default function Console() {
 
   const { running: sagiRunning, log: sagiLog, setLog: setSagiLog, disk: sagiDisk, loadDisk: loadSagiDisk,
     buildStep: sagiBuildStep, runLoop: runSagiLoop, stopLoop: stopSagi, maxSteps: SAGI_MAX_STEPS } =
-    useSagi({ collectChat, savante: SAVANTE_PROMPT, directive: SAGI_DIRECTIVE, autonomous, sagi, maxSteps: 1000 });
+    useSagi({ collectChat, savante: SAVANTE_PROMPT, directive: SAGI_DIRECTIVE, autonomous, sagi, maxSteps: 1024, target: sagiSteps });
 
   // boot: restore page-specific persisted state (prefs/models handled in hooks)
   useEffect(() => {
@@ -312,12 +315,12 @@ export default function Console() {
           <h3>⚛ Start sAGI build</h3>
           <p className="dim small">Pick how many interactions to build (a step = one input→response). Each step advances toward the goal.</p>
           <div className="chooser-steps">
-            <button className="btn ghost icon" onClick={() => setSagiSteps((s) => Math.max(1, s - (s > 200 ? 100 : s > 20 ? 10 : 1)))}>−</button>
+            <button className="btn ghost icon" onClick={() => setSagiSteps(pow2Down)}>−</button>
             <div className="chooser-n">{sagiSteps.toLocaleString()}<span className="dim small"> {sagiSteps === 1 ? 'goal' : 'goals'}</span></div>
-            <button className="btn ghost icon" onClick={() => setSagiSteps((s) => Math.min(1000, s + (s >= 200 ? 100 : s >= 20 ? 10 : 1)))}>+</button>
+            <button className="btn ghost icon" onClick={() => setSagiSteps(pow2Up)}>+</button>
           </div>
           <div className="chooser-presets">
-            {[10, 100, 1000].map((n) => <button key={n} className={'btn' + (sagiSteps === n ? ' primary' : ' ghost')} onClick={() => setSagiSteps(n)}>{n.toLocaleString()}</button>)}
+            {SAGI_ITERS.map((n) => <button key={n} className={'btn sm' + (sagiSteps === n ? ' primary' : ' ghost')} onClick={() => setSagiSteps(n)}>{n}</button>)}
           </div>
           <input className="chooser-goal" placeholder="Goal (optional) — what should sAGI build toward?" value={sagiGoal} onChange={(e) => setSagiGoal(e.target.value)} />
           <div className="chooser-actions">
@@ -490,8 +493,15 @@ export default function Console() {
                 {autonomous
                   ? (sagiRunning
                       ? <button className="btn" onClick={stopSagi}>■ Stop building</button>
-                      : <button className="btn primary" onClick={runSagiLoop} disabled={sagiLog.length >= SAGI_MAX_STEPS}>▶ Begin autonomous build</button>)
+                      : <button className="btn primary" onClick={runSagiLoop} disabled={sagiLog.length >= sagiSteps}>▶ Build {sagiSteps.toLocaleString()}</button>)
                   : null}
+                {autonomous && (
+                  <span className="iter-stepper" title="iterations to build — edit with the arrows">
+                    <button className="iter-arrow" onClick={() => setSagiSteps(pow2Up)} disabled={sagiRunning}>▲</button>
+                    <span className="iter-n">{sagiRunning ? `${sagiLog.length}/${sagiSteps.toLocaleString()}` : sagiSteps.toLocaleString()}</span>
+                    <button className="iter-arrow" onClick={() => setSagiSteps(pow2Down)} disabled={sagiRunning}>▼</button>
+                  </span>
+                )}
                 <button className="btn ghost sm" onClick={() => setSagiLog([])} disabled={!sagiLog.length || sagiRunning}>Reset</button>
                 <button className="btn ghost sm" onClick={() => download('sagi-architecture.md', sagiLog.map((s) => `## ${s.step}. ${s.title}\n\n${s.body}`).join('\n\n---\n\n'))} disabled={!sagiLog.length}>↓ export</button>
                 <button className="btn ghost sm" onClick={savePoint} disabled={savingPt || !(sagiDisk.count || sagiLog.length)} title="save this moment: gitmind commit + .history + RAGE + shareable export (copied to clipboard)">{savingPt ? 'saving…' : '⭑ Save point'}</button>
@@ -511,7 +521,7 @@ export default function Console() {
                 </div>
               )}
               {!autonomous && <div className="notice" style={{ marginBottom: 12 }}>Autonomous is off — sAGI builds one module per input/response. Turn <b>Autonomous</b> on (Preferences) for a continuous self-building loop.</div>}
-              {sagiRunning && <div className="notice" style={{ marginBottom: 12 }}><span className="spin" /> building autonomously with {model} — stops if you turn Autonomous off. Capped at {SAGI_MAX_STEPS} steps.</div>}
+              {sagiRunning && <div className="notice" style={{ marginBottom: 12 }}><span className="spin" /> building with {model} — {sagiLog.length}/{sagiSteps.toLocaleString()} iterations. Stops if you turn Autonomous off.</div>}
               {sagiLog.length === 0 ? <div className="dim small">No modules yet. {autonomous ? 'Press “Begin autonomous build”.' : 'Direct the first build step above.'}</div> : (
                 <div className="sagilog">
                   {sagiLog.map((s) => (
