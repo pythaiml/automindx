@@ -11,7 +11,15 @@ Deps: requests (+ a running Ollama). Reuses the aGLM PODA loop from aglm/.
 
     python3 sagi_build.py                 # build 3 modules with the default model
     python3 sagi_build.py --steps 5 --model gpt-oss:120b-cloud
+    python3 sagi_build.py --backend claude-cli   # build with Claude via your CLI subscription
+    python3 sagi_build.py --backend claude-api   # build with the Anthropic API (ANTHROPIC_API_KEY)
     python3 sagi_build.py --loop          # autonomous loop via aglm.AutonomousLoop
+
+Backends (agnostic — sAGI doesn't care which mind drives it):
+    ollama      (default) a running Ollama daemon
+    claude-cli  the host `claude` binary in headless mode — uses your Claude
+                subscription, no API key ("log into the terminal, call claude")
+    claude-api  the Anthropic Messages API with ANTHROPIC_API_KEY
 """
 from __future__ import annotations
 
@@ -20,7 +28,10 @@ import asyncio
 import json
 import os
 import re
+import shutil
+import subprocess
 import time
+import urllib.request
 
 import requests
 
@@ -29,6 +40,10 @@ MODULES_DIR = os.path.join(SAGI_DIR, "modules")
 MANIFEST = os.path.join(SAGI_DIR, "manifest.json")
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 DEFAULT_MODEL = os.environ.get("CODEPHREAK_MODEL", "gpt-oss:120b-cloud")
+# Model backend: 'ollama' (default) | 'claude-cli' (host `claude` CLI, uses your
+# Claude subscription — no API key) | 'claude-api' (Anthropic API + ANTHROPIC_API_KEY).
+BACKEND = os.environ.get("SAGI_BACKEND", "ollama")
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
 
 SAVANTE = (
     "You are Savante — sAGI, a scientific savant general intelligence within "
@@ -51,7 +66,7 @@ def slug(title: str) -> str:
     return s or "module"
 
 
-def ask_model(model: str, prompt: str) -> str:
+def _ask_ollama(model: str, prompt: str) -> str:
     """One non-streaming chat turn against Ollama."""
     r = requests.post(
         f"{OLLAMA}/api/chat",
@@ -65,7 +80,54 @@ def ask_model(model: str, prompt: str) -> str:
     return (r.json().get("message") or {}).get("content", "").strip()
 
 
-def build_step(model: str) -> dict:
+def _ask_claude_cli(model: str, prompt: str) -> str:
+    """Call Claude through the host's `claude` CLI in headless print mode.
+
+    This is the 'log into the terminal, call claude' path: it uses whatever Claude
+    subscription the CLI is already signed in with — no API key. Requires the
+    `claude` binary on PATH (https://claude.com/claude-code).
+    """
+    if not shutil.which("claude"):
+        raise RuntimeError("`claude` CLI not found on PATH — install Claude Code, or use --backend ollama")
+    cmd = ["claude", "-p", prompt, "--append-system-prompt", SAVANTE]
+    if model and model.startswith("claude"):
+        cmd += ["--model", model]
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    if out.returncode != 0:
+        raise RuntimeError(f"claude CLI failed: {(out.stderr or out.stdout).strip()[:200]}")
+    return out.stdout.strip()
+
+
+def _ask_claude_api(model: str, prompt: str) -> str:
+    """Call Claude via the Anthropic Messages API (needs ANTHROPIC_API_KEY)."""
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        raise RuntimeError("ANTHROPIC_API_KEY not set — export it, or use --backend claude-cli")
+    mid = model if (model or "").startswith("claude") else ANTHROPIC_MODEL
+    body = json.dumps({
+        "model": mid, "max_tokens": 1024, "system": SAVANTE,
+        "messages": [{"role": "user", "content": prompt}],
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages", data=body,
+        headers={"content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01"},
+    )
+    with urllib.request.urlopen(req, timeout=300) as r:
+        data = json.loads(r.read())
+    return "".join(b.get("text", "") for b in data.get("content", [])).strip()
+
+
+def ask_model(model: str, prompt: str, backend: str = None) -> str:
+    """Dispatch one turn to the chosen backend (Ollama, Claude CLI, or Claude API)."""
+    b = backend or BACKEND
+    if b == "claude-cli":
+        return _ask_claude_cli(model, prompt)
+    if b == "claude-api":
+        return _ask_claude_api(model, prompt)
+    return _ask_ollama(model, prompt)
+
+
+def build_step(model: str, backend: str = None) -> dict:
     """One PODA-style step: propose → specify → persist."""
     manifest = read_manifest()
     built = "; ".join(m["title"] for m in manifest["modules"]) or "(none)"
@@ -76,7 +138,7 @@ def build_step(model: str) -> dict:
         "how it plugs into an agnostic core · how it advances self-building). "
         "Keep it modular and includable in any project (including as a Tauri app)."
     )
-    text = ask_model(model, prompt)
+    text = ask_model(model, prompt, backend)
     title = next((l for l in text.splitlines() if l.strip()), "Module")
     title = title.replace("**", "")
     title = re.sub(r"^#+\s*|^title:\s*|^module\s*\d*\s*[:\-–]\s*", "", title, flags=re.I).strip("* ").strip()[:90] or "Module"
@@ -96,17 +158,17 @@ def build_step(model: str) -> dict:
     return {"success": True, "step": step, "title": title}
 
 
-def build(model: str, steps: int) -> None:
-    print(f"sAGI headless build · model={model} · {steps} step(s) → {SAGI_DIR}")
+def build(model: str, steps: int, backend: str = None) -> None:
+    print(f"sAGI headless build · backend={backend or BACKEND} · model={model} · {steps} step(s) → {SAGI_DIR}")
     for _ in range(steps):
         try:
-            build_step(model)
+            build_step(model, backend)
         except Exception as e:
             print(f"  ✗ step failed: {e}")
             break
 
 
-async def build_loop(model: str, steps: int, interval: float = 2.0) -> None:
+async def build_loop(model: str, steps: int, interval: float = 2.0, backend: str = None) -> None:
     """Drive the build with the migrated aGLM PODA loop (agnostic orchestrator)."""
     from aglm import AGLMCore, AutonomousLoop, Decision, PerceptionContext
 
@@ -122,7 +184,7 @@ async def build_loop(model: str, steps: int, interval: float = 2.0) -> None:
         if d.action == "stop":
             return {"success": True, "done": True}
         remaining["n"] -= 1
-        return build_step(model)
+        return build_step(model, backend)
 
     core = AGLMCore(perceive=perceive, decide=decide, act=act, agent_id="sagi.builder")
     loop = AutonomousLoop(core, interval_seconds=interval)
@@ -136,9 +198,15 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--steps", type=int, default=3)
+    ap.add_argument("--backend", default=BACKEND, choices=["ollama", "claude-cli", "claude-api"],
+                    help="model backend (claude-cli uses your Claude subscription via the terminal)")
     ap.add_argument("--loop", action="store_true", help="drive via aglm.AutonomousLoop")
     a = ap.parse_args()
+    # If a Claude backend is chosen but the model is still the Ollama default, use a Claude model.
+    model = a.model
+    if a.backend.startswith("claude") and not model.startswith("claude"):
+        model = ANTHROPIC_MODEL
     if a.loop:
-        asyncio.run(build_loop(a.model, a.steps))
+        asyncio.run(build_loop(model, a.steps, backend=a.backend))
     else:
-        build(a.model, a.steps)
+        build(model, a.steps, backend=a.backend)
