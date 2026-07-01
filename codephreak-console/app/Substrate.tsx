@@ -74,10 +74,13 @@ export default function Substrate({ a = '#2ee6a6', b = '#37b6ff', seed = 0, flux
     const cur = { a: [...target.current.a] as number[], b: [...target.current.b] as number[], seed: target.current.seed, flux: target.current.flux };
     let raf = 0; const t0 = performance.now();
     const draw = (now: number) => {
-      const k = 0.06; const tg = target.current;
-      for (let i = 0; i < 3; i++) { cur.a[i] = lerp(cur.a[i], tg.a[i], k); cur.b[i] = lerp(cur.b[i], tg.b[i], k); }
-      cur.seed = lerp(cur.seed, tg.seed, k);
-      cur.flux = lerp(cur.flux, tg.flux, 0.08);
+      // Gentle, eased crossfade so persona transitions flow seamlessly:
+      // colours ease over ~1s, the noise-domain seed drifts very slowly (no
+      // abrupt scroll), flux stays responsive to thinking.
+      const tg = target.current;
+      for (let i = 0; i < 3; i++) { cur.a[i] = lerp(cur.a[i], tg.a[i], 0.03); cur.b[i] = lerp(cur.b[i], tg.b[i], 0.03); }
+      cur.seed = lerp(cur.seed, tg.seed, 0.012);
+      cur.flux = lerp(cur.flux, tg.flux, 0.06);
       gl.uniform1f(uTime, (now - t0) / 1000); gl.uniform1f(uSeed, cur.seed); gl.uniform1f(uFlux, cur.flux);
       gl.uniform3fv(uA, cur.a); gl.uniform3fv(uB, cur.b);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
