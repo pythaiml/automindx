@@ -311,7 +311,8 @@ export default function Console() {
                           <div className="genstat">
                             <span className="spin" /> {reasoning && !body ? 'codephreak is thinking' : 'generating'}…
                             {genElapsed && <span className="mono"> · {genElapsed}s</span>}
-                            <span className="mono"> · ~{estTok(m)} tokens</span>
+                            <span className="mono"> · ~{estTok(m)} tok</span>
+                            {genElapsed && Number(genElapsed) > 0.3 && <span className="mono"> · {(estTok(m) / Number(genElapsed)).toFixed(1)} tok/s</span>}
                           </div>
                         )}
                         {m.role === 'assistant' && reasoning && (
