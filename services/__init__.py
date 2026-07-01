@@ -15,6 +15,9 @@ from .memory_service import MemoryService
 from .memory import get_memory
 from .model_service import ModelService
 from .inference_orchestrator import InferenceOrchestrator
+from .model_registry import ModelRegistry          # audit #9 — versioned config + integrity
+from .secrets import get_secret, set_secret, redact  # audit #10 — secrets management
 
 # RAGE semantic memory (pgvector) is optional; imported lazily by get_memory().
-__all__ = ["settings", "MemoryService", "get_memory", "ModelService", "InferenceOrchestrator"]
+__all__ = ["settings", "MemoryService", "get_memory", "ModelService",
+           "InferenceOrchestrator", "ModelRegistry", "get_secret", "set_secret", "redact"]

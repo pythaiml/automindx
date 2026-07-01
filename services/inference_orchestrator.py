@@ -62,7 +62,14 @@ class InferenceOrchestrator:
 
     @staticmethod
     def _sanitize(text: str) -> str:
-        return _UNSAFE.sub("", text or "").strip()[:8000]
+        cleaned = _UNSAFE.sub("", text or "")
+        # Neutralize chat-template role markers so user input can't spoof a
+        # system/assistant turn (prompt-injection defense — codephreak checklist).
+        cleaned = re.sub(
+            r"<\|(?:im_start|im_end|system|user|assistant|endoftext)\|>|<</?SYS>>|\[/?INST\]",
+            "", cleaned, flags=re.I,
+        )
+        return cleaned.strip()[:8000]
 
     def _build_messages(self, sanitized: str, session_id: str) -> list:
         msgs = [{"role": "system", "content": self.system_prompt}]
