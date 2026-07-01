@@ -40,3 +40,7 @@ sagi/.gitmind/
 
 # sAGI point-of-save exports (runtime)
 sagi/savepoints/
+
+# spawned sAGI (runtime): subordinate children + sovereign peers
+sagi/children/
+sagi/sovereign/
