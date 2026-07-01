@@ -42,6 +42,16 @@ MANIFEST = os.path.join(SAGI_DIR, "manifest.json")
 # module it grows is appended to .history so the whole self-build can be replayed.
 HISTORY_DIR = os.path.join(SAGI_DIR, ".history")
 HISTORY_LOG = os.path.join(HISTORY_DIR, "build.jsonl")
+GOAL_FILE = os.path.join(SAGI_DIR, "goal.txt")
+CURRENT_GOAL = ""   # set from --goal or goal.txt; steers each module choice
+
+
+def read_goal() -> str:
+    try:
+        with open(GOAL_FILE, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
 
 
 def log_history(event: dict) -> None:
@@ -151,6 +161,8 @@ def build_step(model: str, backend: str = None) -> dict:
         "how it plugs into an agnostic core · how it advances self-building). "
         "Keep it modular and includable in any project (including as a Tauri app)."
     )
+    if CURRENT_GOAL:
+        prompt = f"Overarching goal: {CURRENT_GOAL}. Choose the next module that best advances this goal.\n" + prompt
     text = ask_model(model, prompt, backend)
     title = next((l for l in text.splitlines() if l.strip()), "Module")
     title = title.replace("**", "")
@@ -219,8 +231,20 @@ if __name__ == "__main__":
     ap.add_argument("--steps", type=int, default=3)
     ap.add_argument("--backend", default=BACKEND, choices=["ollama", "claude-cli", "claude-api"],
                     help="model backend (claude-cli uses your Claude subscription via the terminal)")
+    ap.add_argument("--goal", default="", help="overarching goal that steers each module choice")
+    ap.add_argument("--set-goal", default=None, help="persist a standing goal to sagi/goal.txt and exit")
     ap.add_argument("--loop", action="store_true", help="drive via aglm.AutonomousLoop")
     a = ap.parse_args()
+    if a.set_goal is not None:
+        os.makedirs(SAGI_DIR, exist_ok=True)
+        with open(GOAL_FILE, "w", encoding="utf-8") as f:
+            f.write(a.set_goal.strip() + "\n")
+        log_history({"event": "goal", "goal": a.set_goal.strip()})
+        print(f"sAGI goal set → {a.set_goal.strip() or '(cleared)'}")
+        raise SystemExit(0)
+    CURRENT_GOAL = a.goal.strip() or read_goal()
+    if CURRENT_GOAL:
+        print(f"sAGI goal: {CURRENT_GOAL}")
     # If a Claude backend is chosen but the model is still the Ollama default, use a Claude model.
     model = a.model
     if a.backend.startswith("claude") and not model.startswith("claude"):
