@@ -7,7 +7,7 @@ import { useEffect, useRef } from 'react';
 // (the flux surge is the event cue); degrades to nothing when WebGL is absent.
 const FRAG = `
 precision highp float;
-uniform vec2 u_res; uniform float u_time; uniform float u_seed; uniform float u_flux;
+uniform vec2 u_res; uniform float u_time; uniform float u_seed; uniform float u_flux; uniform float u_calm;
 uniform vec3 u_a; uniform vec3 u_b;
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
 float noise(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.0-2.0*f);
@@ -16,7 +16,7 @@ float fbm(vec2 p){ float v=0.0, a=0.5; for(int i=0;i<6;i++){ v+=a*noise(p); p=p*
 void main(){
   vec2 uv = gl_FragCoord.xy / u_res.xy;
   vec2 p = uv * 3.0 + u_seed; p.x *= u_res.x/u_res.y;
-  float t = u_time * (0.06 + 0.08 * u_flux);          // steady; gently quickens while thinking
+  float t = u_time * (0.06 + 0.08 * u_flux) * (1.0 - 0.7 * u_calm);   // steady; mellow (slow) in the persona picker
   // domain-warped flow — livelier warp under flux
   vec2 q = vec2(fbm(p + t), fbm(p - t + 5.2 + u_seed));
   vec2 r = vec2(fbm(p + (1.6 + 0.8*u_flux)*q + vec2(1.7, 9.2) + t),
@@ -46,11 +46,11 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-export default function Substrate({ a = '#2ee6a6', b = '#37b6ff', seed = 0, flux = 0 }:
-  { a?: string; b?: string; seed?: number; flux?: number }) {
+export default function Substrate({ a = '#2ee6a6', b = '#37b6ff', seed = 0, flux = 0, mellow = false }:
+  { a?: string; b?: string; seed?: number; flux?: number; mellow?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const target = useRef({ a: hexToRgb(a), b: hexToRgb(b), seed, flux });
-  target.current = { a: hexToRgb(a), b: hexToRgb(b), seed, flux };
+  const target = useRef({ a: hexToRgb(a), b: hexToRgb(b), seed, flux, calm: mellow ? 1 : 0 });
+  target.current = { a: hexToRgb(a), b: hexToRgb(b), seed, flux, calm: mellow ? 1 : 0 };
 
   useEffect(() => {
     const cv = ref.current; if (!cv) return;
@@ -69,7 +69,7 @@ export default function Substrate({ a = '#2ee6a6', b = '#37b6ff', seed = 0, flux
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const U = (n: string) => gl.getUniformLocation(prog, n);
-    const uRes = U('u_res'), uTime = U('u_time'), uA = U('u_a'), uB = U('u_b'), uSeed = U('u_seed'), uFlux = U('u_flux');
+    const uRes = U('u_res'), uTime = U('u_time'), uA = U('u_a'), uB = U('u_b'), uSeed = U('u_seed'), uFlux = U('u_flux'), uCalm = U('u_calm');
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -78,7 +78,7 @@ export default function Substrate({ a = '#2ee6a6', b = '#37b6ff', seed = 0, flux
     };
     resize(); window.addEventListener('resize', resize);
 
-    const cur = { a: [...target.current.a] as number[], b: [...target.current.b] as number[], seed: target.current.seed, flux: target.current.flux };
+    const cur = { a: [...target.current.a] as number[], b: [...target.current.b] as number[], seed: target.current.seed, flux: target.current.flux, calm: target.current.calm };
     let raf = 0; const t0 = performance.now();
     const draw = (now: number) => {
       // Gentle, eased crossfade so persona transitions flow seamlessly:
@@ -88,10 +88,11 @@ export default function Substrate({ a = '#2ee6a6', b = '#37b6ff', seed = 0, flux
       for (let i = 0; i < 3; i++) { cur.a[i] = lerp(cur.a[i], tg.a[i], 0.03); cur.b[i] = lerp(cur.b[i], tg.b[i], 0.03); }
       cur.seed = lerp(cur.seed, tg.seed, 0.012);
       cur.flux = lerp(cur.flux, tg.flux, 0.06);
-      gl.uniform1f(uTime, (now - t0) / 1000); gl.uniform1f(uSeed, cur.seed); gl.uniform1f(uFlux, cur.flux);
+      cur.calm = lerp(cur.calm, tg.calm, 0.05);           // ease into/out of the mellow picker state
+      gl.uniform1f(uTime, (now - t0) / 1000); gl.uniform1f(uSeed, cur.seed); gl.uniform1f(uFlux, cur.flux); gl.uniform1f(uCalm, cur.calm);
       gl.uniform3fv(uA, cur.a); gl.uniform3fv(uB, cur.b);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
-      cv.style.opacity = String(0.6 + 0.16 * cur.flux); // gently brighter while thinking
+      cv.style.opacity = String((0.6 - 0.22 * cur.calm) + 0.16 * cur.flux); // dimmer + calmer in the picker
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);  // always animate — the substrate is alive

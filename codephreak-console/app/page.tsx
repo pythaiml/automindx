@@ -29,10 +29,28 @@ const PERSONA_SUBSTRATE: Record<string, { a: string; b: string; seed: number }> 
   automindx: { a: '#7c5cff', b: '#2ee6a6', seed: 11 },
   jaimla: { a: '#37b6ff', b: '#2ee6a6', seed: 23 },
   savante: { a: '#f5c451', b: '#37b6ff', seed: 37 },
+  sagi: { a: '#c792ea', b: '#2ee6a6', seed: 95 },
   sentinel: { a: '#ff5c7a', b: '#ffb454', seed: 51 },
   architect: { a: '#5c8cff', b: '#2ee6a6', seed: 67 },
   mentor: { a: '#46e0a0', b: '#f5c451', seed: 83 },
 };
+
+// Every persona gets a UNIQUE substrate — built-ins above, custom ones derived
+// deterministically from the persona id (so each .persona has its own background).
+function hslHex(h: number, s = 0.7, l = 0.6): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; } else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+  const to = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return `#${to(r)}${to(g)}${to(b)}`;
+}
+function substrateFor(id: string): { a: string; b: string; seed: number } {
+  if (PERSONA_SUBSTRATE[id]) return PERSONA_SUBSTRATE[id];
+  let h = 5381; for (let i = 0; i < id.length; i++) h = ((h * 33) ^ id.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return { a: hslHex(hue), b: hslHex((hue + 150) % 360), seed: h % 97 };
+}
 
 // ─────────────────────────────────────────────────────────────────────────
 // Single source of truth. The persona you edit here IS the system prompt sent
@@ -389,12 +407,12 @@ export default function Console() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSagiPersona, sagiDisk.count, sessions.length]);
 
-  const sub = PERSONA_SUBSTRATE[sagi ? 'savante' : activePersona] || PERSONA_SUBSTRATE.codephreak;
+  const sub = substrateFor(sagi ? 'savante' : activePersona);
   // Deterministic shell for SSR / first paint — avoids any localStorage hydration mismatch.
   if (!mounted) return <div className="app" suppressHydrationWarning />;
   return (
     <>
-    <Substrate a={sub.a} b={sub.b} seed={sub.seed} flux={sagiRunning ? 0.85 : status === 'submitted' ? 0.4 : status === 'streaming' ? 0.7 : 0} />
+    <Substrate a={sub.a} b={sub.b} seed={sub.seed} mellow={tab === 'persona'} flux={sagiRunning ? 0.85 : status === 'submitted' ? 0.4 : status === 'streaming' ? 0.7 : 0} />
     {showTerm && <ClaudeTerminal onClose={() => setShowTerm(false)} onStartSagi={() => { setTab('sagi'); setSagiChooser(true); }} onReady={(ctl) => { termCtlRef.current = ctl; }} onClaude={runClaudeInteractive} />}
     {sagiChooser && (
       <div className="chooser-overlay" onMouseDown={() => setSagiChooser(false)}>
