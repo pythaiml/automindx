@@ -22,8 +22,11 @@ export function useSagi({ collectChat, savante, directive, autonomous, sagi, max
   const autoRef = useRef(autonomous); autoRef.current = autonomous;
   const sagiRef = useRef(sagi); sagiRef.current = sagi;
 
-  // Turning Autonomous (or sAGI) off halts a running loop.
-  useEffect(() => { if (!autonomous || !sagi) stop.current = true; }, [autonomous, sagi]);
+  // Turning Autonomous off halts a running loop (sAGI stops building when
+  // autonomous is off — as designed).
+  useEffect(() => { if (!autonomous) stop.current = true; }, [autonomous]);
+  // Turning the sAGI toggle on starts the creation loop (when autonomous is on).
+  useEffect(() => { if (sagi && autonomous) runLoop(); /* eslint-disable-next-line */ }, [sagi]);
 
   async function loadDisk() {
     try {
@@ -55,7 +58,7 @@ export function useSagi({ collectChat, savante, directive, autonomous, sagi, max
     if (running) return;
     setRunning(true); stop.current = false;
     const titles = log.map((s) => s.title);
-    while (!stop.current && autoRef.current && sagiRef.current && titles.length < maxSteps) {
+    while (!stop.current && autoRef.current && titles.length < maxSteps) {
       titles.push(await buildStep(undefined, titles.join('; ')));
       await new Promise((r) => setTimeout(r, 600));
     }
