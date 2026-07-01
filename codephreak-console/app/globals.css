@@ -413,3 +413,8 @@ h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -.01em; }
 .chooser-presets { display: flex; gap: 8px; justify-content: center; margin-bottom: 18px; }
 .chooser-presets .btn { min-width: 42px; }
 .chooser-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+/* sAGI evolving WebGL background — sits behind the card, morphs with the build. */
+.sagi-view { position: relative; }
+.sagi-view > *:not(.sagi-bg) { position: relative; z-index: 1; }
+.sagi-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: .55; border-radius: 14px; }
