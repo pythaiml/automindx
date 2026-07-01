@@ -35,9 +35,26 @@ function slug(title: string): string {
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'module';
 }
 
-export async function GET() {
-  const m = await readManifest();
-  return Response.json({ ok: true, dir: SAGI_DIR, modules: m.modules || [], count: (m.modules || []).length });
+// Read a specific instance's package when ?dir= is given (confined under SAGI_DIR),
+// else the root sagi/ package. Lets the console show a spawned sAGI's modules.
+function resolveDir(req: Request): string {
+  const rel = new URL(req.url).searchParams.get('dir') || '';
+  if (!rel) return SAGI_DIR;
+  const p = path.resolve(SAGI_DIR, rel);
+  return (p === SAGI_DIR || p.startsWith(SAGI_DIR + path.sep)) ? p : SAGI_DIR;
+}
+
+export async function GET(req: Request) {
+  const dir = resolveDir(req);
+  let m: any = { modules: [] };
+  try { m = JSON.parse(await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')); } catch { /* empty */ }
+  // include each module's content so an instance sub-tab can render it
+  const mods = await Promise.all((m.modules || []).map(async (x: any) => {
+    let body = '';
+    try { body = await fs.readFile(path.join(dir, 'modules', x.file), 'utf8'); } catch { /* missing */ }
+    return { ...x, body };
+  }));
+  return Response.json({ ok: true, dir, name: m.name, version: m.version, modules: mods, count: mods.length });
 }
 
 export async function POST(req: Request) {
