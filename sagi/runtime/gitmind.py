@@ -24,13 +24,19 @@ from typing import Any, Dict, List, Optional
 
 
 class GitMind:
-    def __init__(self, root: str, source_dir: str = "modules", on_commit=None):
+    # Both the grown spec prose (.md) and the executable modules (.py) that make those
+    # capabilities live are memory — a snapshot of the individual must capture both.
+    SNAPSHOT_SUFFIXES = (".md", ".py")
+
+    def __init__(self, root: str, source_dir: str = "modules", on_commit=None,
+                 suffixes=SNAPSHOT_SUFFIXES):
         self.root = os.path.abspath(root)
         self.gm = os.path.join(self.root, ".gitmind")
         self.objects = os.path.join(self.gm, "objects")
         self.head_path = os.path.join(self.gm, "HEAD")
         self.global_path = os.path.join(self.gm, "GLOBAL")   # tip of the global chain
         self.src = os.path.join(self.root, source_dir)
+        self.suffixes = tuple(suffixes)                      # which module forms are memory
         # Optional RAGE sink: called (commit_hash, commit_obj) after each new commit,
         # e.g. to embed the tree into pgvectorscale (see rage_sync.RageSync).
         self.on_commit = on_commit
@@ -53,9 +59,9 @@ class GitMind:
         entries: Dict[str, str] = {}
         try:
             for fn in sorted(os.listdir(self.src)):
-                if fn.endswith(".md"):
+                if fn.endswith(self.suffixes) and not fn.startswith((".", "_")):
                     with open(os.path.join(self.src, fn), "rb") as f:
-                        entries[fn] = self._put(f.read())      # blob per module
+                        entries[fn] = self._put(f.read())      # blob per module (spec + code)
         except OSError:
             pass
         tree_hash = self._put(json.dumps(entries, sort_keys=True).encode())

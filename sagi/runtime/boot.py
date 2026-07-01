@@ -5,11 +5,23 @@
 #   python3 -m sagi.runtime.boot --dir ./sagi          # offline demo (no model call)
 from __future__ import annotations
 
+import importlib.util
+import os
+import re
 from typing import Callable, Dict, Optional, Tuple
 
 from .host import Host
 from .gitmind import GitMind
 from .modules import SEED
+
+
+def _import_file(path: str):
+    """Import a grown NN-slug.py module file under a synthetic name (hyphens aren't identifiers)."""
+    name = "sagi_grown_" + re.sub(r"[^0-9a-zA-Z]+", "_", os.path.basename(path)[:-3])
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def boot(sagi_dir: str, call_model: Optional[Callable[[str, str], str]] = None,
@@ -37,6 +49,16 @@ def boot(sagi_dir: str, call_model: Optional[Callable[[str, str], str]] = None,
     registry = handles["module-registry"]
     for mod in SEED:                          # every seed becomes a live registered module
         registry["register"](mod.MODULE_ID, handles[mod.MODULE_ID], {"deps": mod.DEPS, "motto": mod.MOTTO})
+    host.registry = registry                  # siblings reach each other via host.registry["get"](id)
+    # grow thyself, for real: if the module-loader has been grown, let it import every
+    # executable module in modules/ and activate it through the kernel in deps order.
+    loader_file = os.path.join(host.store.modules_dir, "01-module-loader.py")
+    if os.path.exists(loader_file):
+        loader = _import_file(loader_file).activate(host)
+        handles["module-loader"] = loader
+        registry["register"]("module-loader", loader, {"deps": ["module-registry"], "motto": "load thyself"})
+        for gid in loader["load_all"](registry):
+            handles[gid] = registry["get"](gid)["handle"]
     # every persisted moment is a LOCAL snapshot, chained to .history by timestamp.
     host.on("module.persisted", lambda p: host.memory.commit(
         moment={"event": "module.persisted", **(p or {})}, message=(p or {}).get("id", "")))
