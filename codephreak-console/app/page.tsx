@@ -64,6 +64,8 @@ const SAGI_DIRECTIVE = `\n\n[sAGI MODE — scientific general intelligence]\nOpe
 const uid = () => 'id_' + Date.now().toString(36) + Math.floor(performance.now() % 1e6).toString(36);
 const textOf = (m: any) => (m?.parts || []).filter((p: any) => p.type === 'text').map((p: any) => p.text).join('');
 const reasonOf = (m: any) => (m?.parts || []).filter((p: any) => p.type === 'reasoning').map((p: any) => p.text || p.delta || '').join('');
+// Live token estimate while streaming (~4 chars/token) — replaced by exact counts at finish.
+const estTok = (m: any) => Math.max(0, Math.ceil((reasonOf(m).length + textOf(m).length) / 4));
 const metaOf = (m: any): Meta => (m?.metadata as Meta) || {};
 
 export default function Console() {
@@ -216,8 +218,18 @@ export default function Console() {
     } catch { setLearned([]); }
   }
 
-  const sessionTokens = messages.reduce((a, m) => a + (metaOf(m).totalTokens || 0), 0);
+  const lastMsg = messages[messages.length - 1];
+  const liveTok = busy && lastMsg?.role === 'assistant' ? estTok(lastMsg) : 0;
+  const sessionTokens = messages.reduce((a, m) => a + (metaOf(m).totalTokens || 0), 0) + liveTok;
   const lastAId = [...messages].reverse().find((m) => m.role === 'assistant')?.id;
+  // ticking elapsed timer while a response is generating (event indication)
+  const genStart = useRef(0);
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (busy) { if (!genStart.current) genStart.current = Date.now(); const iv = setInterval(() => forceTick((t) => t + 1), 200); return () => clearInterval(iv); }
+    genStart.current = 0;
+  }, [busy]);
+  const genElapsed = busy && genStart.current ? ((Date.now() - genStart.current) / 1000).toFixed(1) : null;
 
   const SUGGEST = [
     'Write a production-ready Python rate limiter with tests.',
@@ -268,7 +280,7 @@ export default function Console() {
           </span>
           <div className="spacer" />
           <div className={'toggle' + (think ? ' on' : '')} onClick={() => setThink((v) => !v)} title="Show the model's reasoning stream"><span className="switch" /><span className="small">reasoning</span></div>
-          <span className="pill" title="tokens this conversation">🪙 {sessionTokens.toLocaleString()}</span>
+          <span className={'pill' + (busy ? ' livecount' : '')} title="tokens this conversation (live while generating)">🪙 {sessionTokens.toLocaleString()}{busy ? ' ·' : ''}</span>
         </div>
 
         <div className="content">
@@ -295,6 +307,13 @@ export default function Console() {
                           : (prefs.botAvatar ? <img src={prefs.botAvatar} alt="" /> : 'cpk')}
                       </div>
                       <div className="bubble">
+                        {m.role === 'assistant' && isLast && busy && (
+                          <div className="genstat">
+                            <span className="spin" /> {reasoning && !body ? 'codephreak is thinking' : 'generating'}…
+                            {genElapsed && <span className="mono"> · {genElapsed}s</span>}
+                            <span className="mono"> · ~{estTok(m)} tokens</span>
+                          </div>
+                        )}
                         {m.role === 'assistant' && reasoning && (
                           <details className="think" open={!body}>
                             <summary>{body ? '⚛ thought process' : <span><span className="spin" /> thinking…</span>}</summary>
