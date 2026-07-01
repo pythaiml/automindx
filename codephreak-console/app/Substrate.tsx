@@ -3,8 +3,8 @@ import { useEffect, useRef } from 'react';
 
 // A living WebGL substrate — a neural/plasma field that shifts with the active
 // persona and surges into flux while the model is thinking. An homage to the
-// automindX substrate at https://mindx.pythai.net/automindx. Degrades to nothing
-// without WebGL; holds a single frame under prefers-reduced-motion.
+// automindX substrate at https://mindx.pythai.net/automindx. Always animates
+// (the flux surge is the event cue); degrades to nothing when WebGL is absent.
 const FRAG = `
 precision highp float;
 uniform vec2 u_res; uniform float u_time; uniform float u_seed; uniform float u_flux;
@@ -16,7 +16,7 @@ float fbm(vec2 p){ float v=0.0, a=0.5; for(int i=0;i<6;i++){ v+=a*noise(p); p=p*
 void main(){
   vec2 uv = gl_FragCoord.xy / u_res.xy;
   vec2 p = uv * 3.0 + u_seed; p.x *= u_res.x/u_res.y;
-  float t = u_time * (0.03 + 0.07 * u_flux);          // surges while thinking
+  float t = u_time * (0.07 + 0.16 * u_flux);          // always alive; surges while thinking
   // domain-warped flow — livelier warp under flux
   vec2 q = vec2(fbm(p + t), fbm(p - t + 5.2 + u_seed));
   vec2 r = vec2(fbm(p + (1.6 + 0.8*u_flux)*q + vec2(1.7, 9.2) + t),
@@ -49,7 +49,6 @@ export default function Substrate({ a = '#2ee6a6', b = '#37b6ff', seed = 0, flux
     const cv = ref.current; if (!cv) return;
     const gl = cv.getContext('webgl', { antialias: false, alpha: true, premultipliedAlpha: false });
     if (!gl) return;
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const compile = (type: number, src: string) => { const s = gl.createShader(type)!; gl.shaderSource(s, src); gl.compileShader(s); return s; };
     const prog = gl.createProgram()!;
@@ -82,11 +81,10 @@ export default function Substrate({ a = '#2ee6a6', b = '#37b6ff', seed = 0, flux
       gl.uniform1f(uTime, (now - t0) / 1000); gl.uniform1f(uSeed, cur.seed); gl.uniform1f(uFlux, cur.flux);
       gl.uniform3fv(uA, cur.a); gl.uniform3fv(uB, cur.b);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
-      cv.style.opacity = String(0.55 + 0.3 * cur.flux); // brighter while thinking
+      cv.style.opacity = String(0.62 + 0.3 * cur.flux); // brighter while thinking
       raf = requestAnimationFrame(draw);
     };
-    if (reduce) { gl.uniform1f(uTime, 8.0); gl.uniform1f(uSeed, cur.seed); gl.uniform1f(uFlux, 0); gl.uniform3fv(uA, cur.a); gl.uniform3fv(uB, cur.b); gl.drawArrays(gl.TRIANGLES, 0, 3); }
-    else raf = requestAnimationFrame(draw);
+    raf = requestAnimationFrame(draw);  // always animate — the substrate is alive
 
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
   }, []);
