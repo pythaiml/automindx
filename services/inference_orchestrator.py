@@ -6,10 +6,17 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import threading
 import time
 import uuid
 from typing import Optional
+
+# Resource guard (audit #8): cap in-flight requests so one client can't exhaust
+# the box. Excess requests are rejected fast rather than queuing unboundedly.
+_MAX_CONCURRENCY = int(os.getenv("AUTOMINDX_MAX_CONCURRENCY", str(os.cpu_count() or 4)))
+_INFLIGHT = threading.BoundedSemaphore(_MAX_CONCURRENCY)
 
 from .config import settings
 from .memory import get_memory
@@ -73,6 +80,13 @@ class InferenceOrchestrator:
         msgs.append({"role": "user", "content": sanitized})
         return msgs
 
+    def health(self) -> dict:
+        """Liveness/readiness snapshot (audit #12)."""
+        ok = self.model.ping()
+        return {"status": "ok" if ok else "degraded", "model": self.model.model,
+                "memory": type(self.mem).__name__, "ollama": ok,
+                "capacity": _MAX_CONCURRENCY}
+
     def run(self, user_input: str, session_id: Optional[str] = None) -> dict:
         session_id = session_id or str(uuid.uuid4())
         request_id = str(uuid.uuid4())
@@ -82,11 +96,18 @@ class InferenceOrchestrator:
         if not sanitized:
             return {"session_id": session_id, "response": "", "status": "empty-input"}
 
-        messages = self._build_messages(sanitized, session_id)
-        response = self.model.predict(messages)
-
-        self.mem.append(session_id, "user", {"text": sanitized})
-        self.mem.append(session_id, "assistant", {"text": response})
+        # Overload protection: reject fast when at capacity (audit #8).
+        if not _INFLIGHT.acquire(blocking=False):
+            self.log.warning("rejected", extra={"request_id": request_id, "session_id": session_id, "status": "busy"})
+            return {"session_id": session_id, "request_id": request_id,
+                    "response": "Server at capacity — please retry shortly.", "status": "busy"}
+        try:
+            messages = self._build_messages(sanitized, session_id)
+            response = self.model.predict(messages)
+            self.mem.append(session_id, "user", {"text": sanitized})
+            self.mem.append(session_id, "assistant", {"text": response})
+        finally:
+            _INFLIGHT.release()
 
         duration_ms = round((time.time() - start) * 1000, 1)
         self.log.info("inference", extra={

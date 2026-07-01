@@ -38,6 +38,13 @@ class ModelService:
             self._session.headers["Authorization"] = f"Bearer {key}"
         self._ready = True
 
+    def ping(self) -> bool:
+        """Is the model backend reachable? (for health checks)."""
+        try:
+            return self._session.get(f"{self.host}/api/tags", timeout=3).status_code == 200
+        except Exception:
+            return False
+
     def predict(self, messages: List[Dict], think: bool = False) -> str:
         """One chat completion. `messages` is [{role, content}, ...]."""
         try:

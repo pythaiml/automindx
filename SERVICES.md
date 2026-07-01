@@ -53,11 +53,20 @@ AUTOMINDX_EMBED_MODEL=all-MiniLM-L6-v2     AUTOMINDX_EMBED_DIM=384   AUTOMINDX_M
 
 Optional deps for the RAGE backend: `pip install psycopg2-binary pgvector sentence-transformers`.
 
+## Resource limits & health (audit #8, #12)
+
+- **Overload guard** — `InferenceOrchestrator.run()` acquires a bounded semaphore
+  (`AUTOMINDX_MAX_CONCURRENCY`, default = CPU count); at capacity it rejects fast
+  with `status: "busy"` rather than queuing unboundedly (DoS protection).
+- **Health** — `orchestrator.health()` reports model reachability + memory backend;
+  the running `codephreak.py` engine exposes **`GET /healthz`** for Docker/K8s probes.
+- Per-request timeout is enforced on the model call (`AUTOMINDX_TIMEOUT`).
+
 ## Codephreak audit coverage
 
 Done: **#1** service layer · **#2** persistent memory (SQLite + pgvector) ·
-**#3** lazy cached model · **#4** input sanitization · **#5** structured JSON logs
-(request_id/duration_ms/status) · **#6** modular env config · **#7** pytest.
-Deferred (rationale in [CODEPHREAK_AUDIT.md](CODEPHREAK_AUDIT.md)): **#8** resource
-limits, **#9** versioned checkpoints (N/A for the Ollama daemon), **#10** secrets
-(env/keyring only — never embedded).
+**#3** lazy cached model · **#4** input sanitization · **#5** structured JSON logs ·
+**#6** modular env config · **#7** pytest · **#8** resource/overload limits ·
+**#12** health check. Deferred (rationale in [CODEPHREAK_AUDIT.md](CODEPHREAK_AUDIT.md)):
+**#9** versioned checkpoints and **#10** OS-keyring secrets (N/A / minimal for the
+Ollama-daemon model + local-first posture; secrets already env-only, never embedded).

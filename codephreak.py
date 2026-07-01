@@ -188,6 +188,9 @@ class Handler(BaseHTTPRequestHandler):
                              "directives": ENGINE.directives(pid)})
         elif u.path == "/stats":
             self._send(200, ENGINE.stats())
+        elif u.path in ("/healthz", "/health"):
+            # Liveness endpoint (audit #12) — for Docker/K8s health probes.
+            self._send(200, {"status": "ok", "service": "codephreak", "events": len(ENGINE.log)})
         else:
             self._send(404, {"error": "not found"})
 

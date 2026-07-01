@@ -57,6 +57,29 @@ def test_config_defaults():
     assert settings.max_context >= 1 and settings.ollama_host.startswith("http")
 
 
+def test_health_snapshot():
+    orch = InferenceOrchestrator()
+    orch.model.ping = lambda: True
+    h = orch.health()
+    assert h["status"] == "ok" and h["ollama"] is True and h["capacity"] >= 1
+
+
+def test_overload_guard_rejects_at_capacity():
+    import services.inference_orchestrator as io
+    orch = InferenceOrchestrator()
+    orch.mem = MemoryService(_tmp_db())
+    orch.model.predict = lambda messages, think=False: "ok"
+    # Drain the semaphore to simulate a full box, then a request must be rejected fast.
+    held = [io._INFLIGHT.acquire(blocking=False) for _ in range(io._MAX_CONCURRENCY)]
+    try:
+        out = orch.run("hello", "s")
+        assert out["status"] == "busy"
+    finally:
+        for h in held:
+            if h:
+                io._INFLIGHT.release()
+
+
 def test_memory_factory_defaults_to_sqlite():
     from services.memory import get_memory
     assert type(get_memory()).__name__ == "MemoryService"  # compatible default
