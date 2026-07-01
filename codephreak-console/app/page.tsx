@@ -84,6 +84,17 @@ export default function Console() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const activeSession = useRef<string | null>(null);
   const [showTerm, setShowTerm] = useState(false);      // Claude terminal popup
+  const termSendRef = useRef<((s: string) => void) | null>(null);
+  const [sagiChooser, setSagiChooser] = useState(false); // "how many interactions?" prompt
+  const [sagiSteps, setSagiSteps] = useState(() => { try { return Math.min(20, Math.max(1, Number(localStorage.getItem('cpk.sagiSteps')) || 3)); } catch { return 3; } });
+  useEffect(() => { try { localStorage.setItem('cpk.sagiSteps', String(sagiSteps)); } catch { /* ignore */ } }, [sagiSteps]);
+  const launchSagi = (autonomousLoop: boolean) => {
+    const cmd = autonomousLoop
+      ? 'python3 sagi_build.py --backend claude-cli --loop --steps 99\r'   // continuous until you Ctrl-C
+      : `python3 sagi_build.py --backend claude-cli --steps ${sagiSteps}\r`;
+    if (termSendRef.current) termSendRef.current(cmd);
+    setSagiChooser(false);
+  };
   const [autonomous, setAutonomous] = useState(true);   // self-provision (auto-pull) — default ON
   const [sagi, setSagi] = useState(false);              // sAGI mode from Savante — default OFF
 
@@ -274,7 +285,29 @@ export default function Console() {
   return (
     <>
     <Substrate a={sub.a} b={sub.b} seed={sub.seed} flux={sagiRunning ? 0.85 : status === 'submitted' ? 0.4 : status === 'streaming' ? 0.7 : 0} />
-    {showTerm && <ClaudeTerminal onClose={() => setShowTerm(false)} onStartSagi={() => setTab('sagi')} />}
+    {showTerm && <ClaudeTerminal onClose={() => setShowTerm(false)} onStartSagi={() => { setTab('sagi'); setSagiChooser(true); }} onReady={(send) => { termSendRef.current = send; }} />}
+    {sagiChooser && (
+      <div className="chooser-overlay" onMouseDown={() => setSagiChooser(false)}>
+        <div className="chooser" onMouseDown={(e) => e.stopPropagation()}>
+          <h3>⚛ Start sAGI build</h3>
+          <p className="dim small">Claude drives the self-build. How many interactions (a step = one input→response)?</p>
+          <div className="chooser-steps">
+            <button className="btn ghost icon" onClick={() => setSagiSteps((s) => Math.max(1, s - 1))}>−</button>
+            <div className="chooser-n">{sagiSteps}<span className="dim small"> steps</span></div>
+            <button className="btn ghost icon" onClick={() => setSagiSteps((s) => Math.min(20, s + 1))}>+</button>
+          </div>
+          <div className="chooser-presets">
+            {[1, 3, 5, 10].map((n) => <button key={n} className={'btn sm' + (sagiSteps === n ? ' primary' : ' ghost')} onClick={() => setSagiSteps(n)}>{n}</button>)}
+          </div>
+          <div className="chooser-actions">
+            <button className="btn primary" onClick={() => launchSagi(false)}>▶ Build {sagiSteps} step{sagiSteps > 1 ? 's' : ''}</button>
+            <button className="btn" onClick={() => launchSagi(true)} title="continuous self-build until you Ctrl-C in the terminal">∞ Autonomous</button>
+            <button className="btn ghost sm" onClick={() => setSagiChooser(false)}>Cancel</button>
+          </div>
+          <p className="dim small" style={{ marginTop: 4 }}>Runs in the ⌘ Terminal (needs <span className="mono">claude</span> signed in). Watch it grow below.</p>
+        </div>
+      </div>
+    )}
     <div className="app">
       <aside className="side">
         <div className="brand">

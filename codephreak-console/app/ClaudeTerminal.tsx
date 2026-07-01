@@ -9,15 +9,10 @@ import '@xterm/xterm/css/xterm.css';
 const PTY_PORT = 3101;
 type Mode = 'normal' | 'min' | 'max';
 
-export default function ClaudeTerminal({ onClose, onStartSagi }: { onClose: () => void; onStartSagi?: () => void }) {
+export default function ClaudeTerminal({ onClose, onStartSagi, onReady }: { onClose: () => void; onStartSagi?: () => void; onReady?: (send: (s: string) => void) => void }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const refitRef = useRef<() => void>(() => {});
   const sendRef = useRef<(s: string) => void>(() => {});
-  // sAGI build iterations the green light launches — adjustable + persisted.
-  const [steps, setSteps] = useState(() => {
-    try { return Math.min(20, Math.max(1, Number(localStorage.getItem('cpk.sagiSteps')) || 3)); } catch { return 3; }
-  });
-  useEffect(() => { try { localStorage.setItem('cpk.sagiSteps', String(steps)); } catch { /* ignore */ } }, [steps]);
   const [mode, setMode] = useState<Mode>('normal');
   const [pos, setPos] = useState(() => ({ x: Math.max(16, (window.innerWidth - 900) / 2), y: 72 }));
   const [size, setSize] = useState(() => ({ w: Math.min(900, window.innerWidth * 0.92), h: Math.min(540, window.innerHeight * 0.74) }));
@@ -57,6 +52,7 @@ export default function ClaudeTerminal({ onClose, onStartSagi }: { onClose: () =
       ws.onclose = () => term.writeln('\r\n\x1b[38;5;203m[terminal server not connected — start it: node codephreak-console/pty-server.js]\x1b[0m');
       term.onData((d) => ws.readyState === 1 && ws.send(d));
       sendRef.current = (s: string) => { if (ws.readyState === 1) { ws.send(s); term.focus(); } };
+      onReady?.(sendRef.current);   // let the sAGI chooser send commands to this PTY
 
       const ro = new ResizeObserver(() => refit());
       ro.observe(hostRef.current);
@@ -93,13 +89,12 @@ export default function ClaudeTerminal({ onClose, onStartSagi }: { onClose: () =
   };
   const onRzUp = () => { rz.current = null; };
 
-  // Green light: start Claude and let sAGI pass in the build commands.
-  // sagi_build --backend claude-cli spawns `claude` per step (subscription CLI)
-  // and feeds it each build prompt — "claude starts, then sAGI passes commands".
+  // Green light: activate the sAGI card, which asks how many interactions (with an
+  // autonomous option) and then sends the Claude-driven build command back to this
+  // PTY — "claude starts, then sAGI passes commands".
   const startClaudeSagi = () => {
-    setMode('normal');
-    onStartSagi?.();   // switch the console to the sAGI tab to watch it grow
-    sendRef.current(`python3 sagi_build.py --backend claude-cli --steps ${steps}\r`);
+    setMode('min');    // shrink so the sAGI card + chooser are visible
+    onStartSagi?.();
   };
   const stop = (e: React.PointerEvent) => e.stopPropagation();   // don't drag when clicking a light
 
@@ -115,14 +110,9 @@ export default function ClaudeTerminal({ onClose, onStartSagi }: { onClose: () =
         <span className="term-dots">
           <i className="tl-red" title="close" onPointerDown={stop} onClick={onClose} />
           <i className="tl-amber" title="minimize" onPointerDown={stop} onClick={() => setMode((m) => (m === 'min' ? 'normal' : 'min'))} />
-          <i className="tl-green" title={`start Claude + sAGI build (${steps} steps) — opens the sAGI tab`} onPointerDown={stop} onClick={startClaudeSagi} />
+          <i className="tl-green" title="start Claude + sAGI build — opens the sAGI card to choose interactions" onPointerDown={stop} onClick={startClaudeSagi} />
         </span>
         <span className="term-title">⌘ Claude terminal — subscription CLI · project: automindX</span>
-        <span className="term-steps" onPointerDown={(e) => e.stopPropagation()} title="sAGI build steps launched by the green light">
-          <button onClick={() => setSteps((s) => Math.max(1, s - 1))}>−</button>
-          <span className="n">{steps}⚛</span>
-          <button onClick={() => setSteps((s) => Math.min(20, s + 1))}>+</button>
-        </span>
         <span className="term-win-btns" onPointerDown={(e) => e.stopPropagation()}>
           <button className="btn ghost sm icon" title="minimize" onClick={() => setMode((m) => (m === 'min' ? 'normal' : 'min'))}>—</button>
           <button className="btn ghost sm icon" title={mode === 'max' ? 'restore' : 'maximize'} onClick={() => setMode((m) => (m === 'max' ? 'normal' : 'max'))}>{mode === 'max' ? '❐' : '□'}</button>
