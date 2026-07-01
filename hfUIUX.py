@@ -6,11 +6,13 @@
 # appear until the model finishes loading. For an entrypoint that loads instantly
 # on modest hardware, use ollama_codephreak.py instead.
 import gradio as gr
-from automind import format_to_llama_chat_style
+from automind import format_to_llama_chat_style, DEFAULT_SYSTEM_PROMPT
 from memory import save_conversation_memory
-from aglm import LlamaModel
+from llama_model import LlamaModel
+from context4096 import ContextWindow
 
 MODEL_ID = "microsoft/phi-2"
+N_CTX = 4096  # the original codephreak (Llama-2) hard context window
 
 # Lazily instantiate so importing this module (and the Space build) doesn't block
 # on a multi-GB model download — the previous module-level LlamaModel(MODEL_ID)
@@ -29,9 +31,15 @@ def chat(user_input, history=None):
     # gradio ChatInterface passes history as [[user, assistant], ...].
     history = history or []
     memory = [list(turn) for turn in history] + [[user_input, None]]
+    llm = get_llm()
+    # Token-aware sliding window: keep the system prompt + newest turns that fit
+    # in 4096 tokens so long conversations never overflow the context (the proper
+    # fix for the old character-based chunk4096.py). See context4096.py.
+    window = ContextWindow(llm.tokenizer, n_ctx=N_CTX, reserve=512)
+    memory = window.fit(memory, DEFAULT_SYSTEM_PROMPT)
     # generate_contextual_output() already applies format_to_llama_chat_style;
     # pass the raw memory list (the old code double-formatted a pre-built prompt).
-    response = get_llm().generate_contextual_output(memory)
+    response = llm.generate_contextual_output(memory)
     save_conversation_memory([[user_input, response]])
     return response
 

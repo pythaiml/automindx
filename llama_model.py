@@ -1,4 +1,7 @@
-#aglm.py
+# llama_model.py
+# The legacy in-process Llama loader (formerly aglm.py — renamed so the modern
+# `aglm/` package can live here). The name "aglm" now refers to the Autonomous
+# General Learning Model package (aglm/), not this transformers loader.
 import os
 import glob
 import ujson

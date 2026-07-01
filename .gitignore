@@ -10,7 +10,7 @@ venv/
 memory/*.json
 
 # Models (downloaded at runtime; never commit the GGML/GGUF weights)
-models/
+/models/
 *.bin
 *.gguf
 *.ggml
@@ -18,3 +18,9 @@ models/
 # Env
 .env
 .env*.local
+memory/*.jsonl
+codephreak-console/node_modules/
+codephreak-console/.next/
+
+# sagi self-build output (runtime)
+sagi/modules/*.md

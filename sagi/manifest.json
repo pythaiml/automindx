@@ -1,0 +1,11 @@
+{
+  "name": "sagi",
+  "description": "self-building, agnostic, modular scientific general intelligence",
+  "grown_from": "Savante persona (automindX)",
+  "version": "0.0.0",
+  "modules": [],
+  "provenance": {
+    "builder": "autonomous loop over a chosen model",
+    "host": "automindX console (agnostic — any orchestrator can drive it)"
+  }
+}
