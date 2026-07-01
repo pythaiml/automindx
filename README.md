@@ -115,6 +115,7 @@ python3 uiux.py \
   - **[GATERAGE/RAGE](https://github.com/GATERAGE/RAGE)** — retrieval substrate (memory)
   - **[GATERAGE/mastermind](https://github.com/GATERAGE/mastermind)** — strategic orchestrator
 - Original codephreak (historical) — <https://github.com/Professor-Codephreak/automind>
+- **mindX** — the production system aGLM was distilled from · docs: **[mindx.pythai.net/docs.html](https://mindx.pythai.net/docs.html)**
 
 > **RAGE remembers · aGLM decides · MASTERMIND orchestrates.**
 

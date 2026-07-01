@@ -62,3 +62,7 @@ beliefs.
 - **[GATERAGE/RAGE](https://github.com/GATERAGE/RAGE)** — retrieval substrate (memory + grounding)
 - **[GATERAGE/mastermind](https://github.com/GATERAGE/mastermind)** — strategic orchestrator (directive layer)
 - **[Professor Codephreak](https://github.com/Professor-Codephreak)** — the origin and the evolving author
+- **[mindX](https://github.com/agenticplace)** — the production consumer these primitives were distilled from · docs: **[mindx.pythai.net/docs.html](https://mindx.pythai.net/docs.html)**
+
+For more information on the autonomous-learning-loop patterns aGLM distills, see
+**<https://mindx.pythai.net/docs.html>**.
