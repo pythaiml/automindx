@@ -3,13 +3,13 @@
 The three canonical modules every individual sAGI ships first, from
 [../POINT_OF_DEPARTURE.md](../POINT_OF_DEPARTURE.md). Each is real `activate(host)`
 work over the agnostic host surface (`core/interface.md`), and each closes a gap
-the audit found. Together: **be thyself, keep thyself honest, grow thyself.**
+the audit found. Together: **be thyself, do no harm, grow thyself.**
 
 **Ship order 1 → 2 → 3** — the persona must exist before it persists; the boundary
 must be sound before a kernel loads modules through it.
 
 1. [individuality-core](01-individuality-core.md) — *be thyself*
-2. [self-package-boundary](02-self-package-boundary.md) — *keep thyself honest*
+2. [self-package-boundary](02-self-package-boundary.md) — *do no harm*
 3. [module-registry](03-module-registry.md) — *grow thyself* (the kernel)
 
 ## How an individual bootstraps from the seed

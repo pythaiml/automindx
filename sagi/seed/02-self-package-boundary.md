@@ -1,6 +1,6 @@
 # self-package-boundary
 
-*keep thyself honest* — owns the individual's persistence boundary and keeps the
+*do no harm* — owns the individual's persistence boundary and keeps the
 ledger truthful (closes the manifest-desync and thin-provenance gaps).
 
 - **id:** `self-package-boundary`
