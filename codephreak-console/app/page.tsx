@@ -108,13 +108,22 @@ export default function Console() {
   };
   const [savingPt, setSavingPt] = useState(false);
   const [savept, setSavept] = useState<any>(null);
+  // Persistent sAGI sub-tabs: each saved sAGI (a point of save) becomes its own tab.
+  const [sagiSaves, setSagiSaves] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('cpk.sagiSaves') || '[]'); } catch { return []; } });
+  useEffect(() => { try { localStorage.setItem('cpk.sagiSaves', JSON.stringify(sagiSaves.slice(0, 30))); } catch { /* ignore */ } }, [sagiSaves]);
+  const [sagiSub, setSagiSub] = useState('overview');   // 'overview' | a save id
   async function savePoint() {
     setSavingPt(true);
     try {
       const r = await fetch('/api/sagi/savepoint', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label: sagiGoal || '' }) });
       const j = await r.json();
-      if (j.ok) { setSavept(j); if (j.text) copy(j.text, 'savepoint'); }
-      else setSavept({ error: j.error || 'save failed' });
+      if (j.ok) {
+        setSavept(j); if (j.text) copy(j.text, 'savepoint');
+        const id = String(j.commit).slice(0, 12);
+        const save = { id, label: sagiGoal || `sAGI ${new Date().toLocaleString()}`, commit: j.commit, ts: j.ts, modules: j.modules, text: j.text };
+        setSagiSaves((prev) => [save, ...prev.filter((s) => s.id !== id)]);
+        setSagiSub(id);   // open the newly-saved sAGI as its own tab
+      } else setSavept({ error: j.error || 'save failed' });
     } catch (e: any) { setSavept({ error: String(e?.message || e) }); }
     setSavingPt(false);
   }
@@ -488,6 +497,16 @@ export default function Console() {
             {tab === 'sagi' && <SagiBackground count={sagiDisk.count} building={sagiRunning || sagiGrew} />}
             <h1>⚛ sAGI <span className="dim small" style={{ fontWeight: 400 }}>self-building · from Savante</span></h1>
             <p className="lead">sAGI is a self-building, agnostic, modular scientific general intelligence grown from the <b>Savante</b> persona. It builds itself one module per step using the chosen model — <b className="mono">{model}</b>. Modules are scaffolded into the agnostic <span className="mono">sagi/</span> package for inclusion in any project (including as a Tauri app).</p>
+            <div className="sagi-subtabs">
+              <span className={'sagi-subtab' + (sagiSub === 'overview' ? ' active' : '')} onClick={() => setSagiSub('overview')}>◈ sAGI</span>
+              {sagiSaves.map((s) => (
+                <span key={s.id} className={'sagi-subtab' + (sagiSub === s.id ? ' active' : '')} onClick={() => setSagiSub(s.id)} title={`gitmind ${s.id} · ${s.modules} module(s)`}>
+                  ⭑ {s.label}
+                  <button className="sagi-subtab-x" title="close this sAGI tab" onClick={(e) => { e.stopPropagation(); setSagiSaves((p) => p.filter((x) => x.id !== s.id)); if (sagiSub === s.id) setSagiSub('overview'); }}>✕</button>
+                </span>
+              ))}
+            </div>
+            {sagiSub === 'overview' ? (
             <div className="card">
               <SagiFace speakText={sagiDisk.modules?.length ? sagiDisk.modules[sagiDisk.modules.length - 1].title : undefined} />
               <SagiVisual modules={sagiDisk.modules || []} building={sagiRunning || sagiGrew} />
@@ -553,6 +572,23 @@ export default function Console() {
                 </div>
               )}
             </div>
+            ) : (() => {
+              const sv = sagiSaves.find((s) => s.id === sagiSub);
+              if (!sv) return <div className="card dim small">saved sAGI not found.</div>;
+              return (
+                <div className="card">
+                  <div className="row" style={{ marginBottom: 12 }}>
+                    <span className="badge on">⭑ saved sAGI · gitmind <span className="mono">{sv.id}</span></span>
+                    <span className="badge">{sv.modules} module(s)</span>
+                    <span className="badge">{new Date((sv.ts || 0) * 1000).toLocaleString()}</span>
+                    <span className="spacer" />
+                    <button className="btn ghost sm" onClick={() => copy(sv.text, 'sv' + sv.id)}>{copied === 'sv' + sv.id ? '✓ copied' : '⧉ copy shareable'}</button>
+                    <button className="btn ghost sm" onClick={() => download(`sagi-${sv.id}.md`, sv.text)}>↓ export</button>
+                  </div>
+                  <div className="sagibody"><ReactMarkdown remarkPlugins={[remarkGfm]}>{sv.text}</ReactMarkdown></div>
+                </div>
+              );
+            })()}
           </section>
 
           {/* ADVANCED */}
