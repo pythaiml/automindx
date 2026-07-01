@@ -439,3 +439,4 @@ h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -.01em; }
 .sf-err { font-size: 11px; color: var(--bad); }
 .chooser-goal { width: 100%; margin-bottom: 12px; }
 .chooser-actions + .chooser-actions { margin-top: 8px; }
+.chip-av { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; margin-right: 7px; vertical-align: middle; border: 1px solid var(--glass-brd); }

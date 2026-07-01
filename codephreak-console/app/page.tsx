@@ -385,7 +385,7 @@ export default function Console() {
                       <div className="av">
                         {m.role === 'user'
                           ? (prefs.avatar ? <img src={prefs.avatar} alt="" /> : (prefs.name || 'YOU').slice(0, 3).toUpperCase())
-                          : (prefs.botAvatar ? <img src={prefs.botAvatar} alt="" /> : 'cpk')}
+                          : ((persona.avatar || prefs.botAvatar) ? <img src={persona.avatar || prefs.botAvatar} alt="" /> : 'cpk')}
                       </div>
                       <div className="bubble">
                         {m.role === 'assistant' && isLast && busy && (
@@ -556,7 +556,7 @@ export default function Console() {
                 {personas.map((p) => (
                   <span key={p.id} className={'chip' + (p.id === activePersona ? '' : '')} onClick={() => setActivePersona(p.id)}
                     style={p.id === activePersona ? { borderColor: 'rgba(46,230,166,.5)', color: 'var(--accent)' } : undefined}>
-                    {p.id === activePersona ? '● ' : '○ '}{p.name}
+                    {p.avatar ? <img className="chip-av" src={p.avatar} alt="" /> : (p.id === activePersona ? '● ' : '○ ')}{p.name}
                   </span>
                 ))}
                 <button className="btn ghost sm" onClick={() => { const id = uid(); setPersonas((ps) => [...ps, { id, name: 'New persona', baseId: 'codephreak', individual: '', prompt: composePersonaPrompt('codephreak', '') }]); setActivePersona(id); }}>+ New</button>
