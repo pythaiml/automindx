@@ -5,6 +5,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { BUILTIN_PERSONAS, CODEPHREAK_PERSONA, type Persona } from '@/lib/persona';
+import { LS } from '@/lib/store';
+import { usePrefs } from '@/hooks/usePrefs';
+import { useModels } from '@/hooks/useModels';
+import { useSagi } from '@/hooks/useSagi';
 import Substrate from './Substrate';
 
 const BUILTIN_IDS = new Set(BUILTIN_PERSONAS.map((p) => p.id));
@@ -54,21 +58,8 @@ const PRESETS: Record<string, Partial<Settings>> = {
   Mirostat: { temperature: 0.8, mirostat: 2, mirostat_tau: 5.0, mirostat_eta: 0.1 },
 };
 
-const LS = { personas: 'cpk.personas', active: 'cpk.activePersona', settings: 'cpk.settings', history: 'cpk.history', think: 'cpk.think', prefs: 'cpk.prefs', autonomous: 'cpk.autonomous', sagi: 'cpk.sagi' };
-
 // sAGI directive layered onto the Savante persona when sAGI mode is engaged.
 const SAGI_DIRECTIVE = `\n\n[sAGI MODE — scientific general intelligence]\nOperate as sAGI: reason across domains from first principles, quantify uncertainty, separate proof from conjecture, cite the principle each claim rests on, and give provably-correct, complexity-annotated solutions. You are the emergent sAGI grown from the Savante persona within automindX.`;
-
-// Actual, persisted user preferences (applied live).
-const PREFS_DEFAULT = {
-  name: 'You',
-  avatar: '',           // data URL — your avatar
-  botAvatar: '',        // data URL — codephreak's avatar
-  accent: '#2ee6a6',    // emerald by default
-  accent2: '#37b6ff',
-  chatFont: 14,         // px
-};
-type Prefs = typeof PREFS_DEFAULT;
 
 const uid = () => 'id_' + Date.now().toString(36) + Math.floor(performance.now() % 1e6).toString(36);
 const textOf = (m: any) => (m?.parts || []).filter((p: any) => p.type === 'text').map((p: any) => p.text).join('');
@@ -77,61 +68,63 @@ const metaOf = (m: any): Meta => (m?.metadata as Meta) || {};
 
 export default function Console() {
   const [tab, setTab] = useState('chat');
-  const [models, setModels] = useState<Models | null>(null);
-  const [access, setAccess] = useState<Record<string, { accessible: boolean; reason: string; detail?: string }>>({});
-  const [model, setModel] = useState(DEFAULT_MODEL);
   const [think, setThink] = useState(true);
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
   const [input, setInput] = useState('');
-
   const [personas, setPersonas] = useState<Persona[]>(BUILTIN_PERSONAS);
   const [activePersona, setActivePersona] = useState('codephreak');
   const [fb, setFb] = useState<Record<string, 'up' | 'down'>>({});
-
   const [sessions, setSessions] = useState<Session[]>([]);
   const activeSession = useRef<string | null>(null);
-  const [prefs, setPrefs] = useState<Prefs>(PREFS_DEFAULT);       // live (applied as preview)
-  const [savedPrefs, setSavedPrefs] = useState<Prefs>(PREFS_DEFAULT); // last persisted snapshot
   const [autonomous, setAutonomous] = useState(true);   // self-provision (auto-pull) — default ON
   const [sagi, setSagi] = useState(false);              // sAGI mode from Savante — default OFF
-  const [pulling, setPulling] = useState<Record<string, string>>({}); // model -> progress
-  const [installMsg, setInstallMsg] = useState('');
-  // sAGI self-building autonomous loop
-  const [sagiRunning, setSagiRunning] = useState(false);
-  const [sagiLog, setSagiLog] = useState<{ step: number; title: string; body: string }[]>([]);
-  const sagiStop = useRef(false);
-  const SAGI_MAX_STEPS = 16; // guard against runaway model calls
-  const [sagiDisk, setSagiDisk] = useState<{ count: number; last?: string }>({ count: 0 });
-  async function loadSagiDisk() { try { const j = await (await fetch('/api/sagi')).json(); if (j.ok) setSagiDisk({ count: j.count }); } catch {} }
+
+  // ── modular concerns (see hooks/) ──
+  const { prefs, setPrefs, dirty: prefsDirty, save: savePrefs, revert: revertPrefs, reset: resetPrefs, uploadAvatar } = usePrefs();
+  const { models, access, model, setModel, pulling, installMsg, live, nModels, cloudSignedIn,
+    loadModels, probeAccess, pull, installOllama, isPulled, isCloud } = useModels(DEFAULT_MODEL);
 
   const { messages, sendMessage, status, stop, setMessages, error } = useChat();
   const logRef = useRef<HTMLDivElement>(null);
   const busy = status === 'streaming' || status === 'submitted';
-
   const persona = personas.find((p) => p.id === activePersona) || personas[0];
 
-  // boot: restore persisted state + poll models
+  // Ollama options from the current settings; a stream collector used by chat + sAGI.
+  function buildOptions(): Record<string, unknown> {
+    const s: any = settings; const o: Record<string, unknown> = {};
+    const keys = ['temperature', 'top_p', 'top_k', 'num_predict', 'repeat_penalty', 'presence_penalty', 'frequency_penalty', 'seed', 'mirostat', 'mirostat_tau', 'mirostat_eta', 'tfs_z', 'typical_p', 'min_p', 'repeat_last_n', 'num_ctx', 'stop'];
+    for (const k of keys) if (s[k] !== '' && s[k] != null) o[k] = s[k];
+    return o;
+  }
+  async function collectChat(system: string, userText: string): Promise<string> {
+    const res = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ messages: [{ id: 's' + Date.now(), role: 'user', parts: [{ type: 'text', text: userText }] }], model, system, options: buildOptions(), think: false }) });
+    if (!res.body) return '[no response]';
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '', text = '';
+    for (;;) {
+      const { done, value } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); const lines = buf.split('\n'); buf = lines.pop() || '';
+      for (const line of lines) { if (!line.startsWith('data: ')) continue; try { const o = JSON.parse(line.slice(6)); if (o.type === 'text-delta') text += o.delta || ''; } catch {} }
+    }
+    return text.trim() || '[empty]';
+  }
+
+  const { running: sagiRunning, log: sagiLog, setLog: setSagiLog, disk: sagiDisk, loadDisk: loadSagiDisk,
+    buildStep: sagiBuildStep, runLoop: runSagiLoop, stopLoop: stopSagi, maxSteps: SAGI_MAX_STEPS } =
+    useSagi({ collectChat, savante: SAVANTE_PROMPT, directive: SAGI_DIRECTIVE, autonomous, sagi });
+
+  // boot: restore page-specific persisted state (prefs/models handled in hooks)
   useEffect(() => {
     try {
       const p = localStorage.getItem(LS.personas);
-      if (p) {
-        const saved: Persona[] = JSON.parse(p);
-        // merge: keep saved edits for built-ins, ensure all built-ins exist, keep customs
-        const merged = [
-          ...BUILTIN_PERSONAS.map((b) => saved.find((s) => s.id === b.id) || b),
-          ...saved.filter((s) => !BUILTIN_IDS.has(s.id)),
-        ];
-        setPersonas(merged);
-      }
+      if (p) { const saved: Persona[] = JSON.parse(p); setPersonas([...BUILTIN_PERSONAS.map((b) => saved.find((s) => s.id === b.id) || b), ...saved.filter((s) => !BUILTIN_IDS.has(s.id))]); }
       const a = localStorage.getItem(LS.active); if (a) setActivePersona(a);
       const s = localStorage.getItem(LS.settings); if (s) setSettings({ ...DEFAULTS, ...JSON.parse(s) });
       const h = localStorage.getItem(LS.history); if (h) setSessions(JSON.parse(h));
       const t = localStorage.getItem(LS.think); if (t) setThink(t === '1');
-      const pr = localStorage.getItem(LS.prefs); if (pr) { const v = { ...PREFS_DEFAULT, ...JSON.parse(pr) }; setPrefs(v); setSavedPrefs(v); }
       const au = localStorage.getItem(LS.autonomous); if (au !== null) setAutonomous(au === '1');
       const sg = localStorage.getItem(LS.sagi); if (sg !== null) setSagi(sg === '1');
     } catch {}
-    loadModels(); const iv = setInterval(loadModels, 8000); return () => clearInterval(iv);
   }, []);
   useEffect(() => { localStorage.setItem(LS.settings, JSON.stringify(settings)); }, [settings]);
   useEffect(() => { localStorage.setItem(LS.personas, JSON.stringify(personas)); }, [personas]);
@@ -139,73 +132,9 @@ export default function Console() {
   useEffect(() => { localStorage.setItem(LS.think, think ? '1' : '0'); }, [think]);
   useEffect(() => { localStorage.setItem(LS.autonomous, autonomous ? '1' : '0'); }, [autonomous]);
   useEffect(() => { localStorage.setItem(LS.sagi, sagi ? '1' : '0'); }, [sagi]);
-  // Apply preferences live as a PREVIEW (accent, chat font). Persisted only on Save.
-  useEffect(() => {
-    const root = document.documentElement.style;
-    root.setProperty('--accent', prefs.accent);
-    root.setProperty('--accent-2', prefs.accent2);
-    root.setProperty('--chat-font', prefs.chatFont + 'px');
-  }, [prefs]);
-  const prefsDirty = JSON.stringify(prefs) !== JSON.stringify(savedPrefs);
-  function savePrefs() {
-    localStorage.setItem(LS.prefs, JSON.stringify(prefs));
-    setSavedPrefs(prefs);
-  }
   useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, status]);
   useEffect(() => { if (status === 'ready' && messages.length) saveSession(messages); /* eslint-disable-next-line */ }, [status]);
   useEffect(() => { if (tab === 'sagi') loadSagiDisk(); /* eslint-disable-next-line */ }, [tab]);
-  useEffect(() => { if (isCloud(model) && !access[model]) probeAccess([model]); /* eslint-disable-next-line */ }, [model, models]);
-
-  async function loadModels() {
-    try { const r = await fetch('/api/models'); const j: Models = await r.json(); setModels(j);
-      if (j.ok && ![...j.local, ...j.cloud].some((m) => m.name === model) && [...j.local, ...j.cloud].some((m) => m.name === DEFAULT_MODEL)) setModel(DEFAULT_MODEL);
-      if (j.ok && j.cloud.length) probeAccess(j.cloud.filter((m) => (m as any).pulled !== false).map((m) => m.name));
-    } catch { setModels({ ok: false, local: [], cloud: [], error: 'offline' }); }
-  }
-
-  // Account-aware: ask whether the signed-in Ollama account can run each cloud
-  // model (server-cached probe). Verdicts drive the badges below, not a static list.
-  async function probeAccess(names: string[]) {
-    const list = names.filter(Boolean);
-    if (!list.length) return;
-    try { const j = await (await fetch('/api/access', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ models: list }) })).json();
-      if (j.ok) setAccess((a) => ({ ...a, ...j.results })); } catch {}
-  }
-  const cloudSignedIn = Object.values(access).some((v) => v.accessible);
-
-  // build the Ollama options object from current settings (blanks dropped server-side)
-  function buildOptions(): Record<string, unknown> {
-    const s: any = settings;
-    const o: Record<string, unknown> = {};
-    const keys = ['temperature','top_p','top_k','num_predict','repeat_penalty','presence_penalty','frequency_penalty','seed','mirostat','mirostat_tau','mirostat_eta','tfs_z','typical_p','min_p','repeat_last_n','num_ctx','stop'];
-    for (const k of keys) if (s[k] !== '' && s[k] != null) o[k] = s[k];
-    return o;
-  }
-
-  // Pull a model on the host (streams Ollama progress). Idempotent.
-  async function pull(name: string): Promise<boolean> {
-    setPulling((p) => ({ ...p, [name]: 'starting…' }));
-    try {
-      const r = await fetch('/api/pull', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: name }) });
-      if (!r.ok || !r.body) { const j = await r.json().catch(() => ({})); setPulling((p) => ({ ...p, [name]: '✗ ' + (j.error || 'failed') })); return false; }
-      const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = '';
-      for (;;) {
-        const { done, value } = await reader.read(); if (done) break;
-        buf += dec.decode(value, { stream: true }); const lines = buf.split('\n'); buf = lines.pop() || '';
-        for (const line of lines) { if (!line.trim()) continue; try { const o = JSON.parse(line); setPulling((p) => ({ ...p, [name]: o.status || '…' })); } catch {} }
-      }
-      setPulling((p) => ({ ...p, [name]: '✓ pulled' }));
-      await loadModels();
-      setTimeout(() => setPulling((p) => { const n = { ...p }; delete n[name]; return n; }), 2500);
-      return true;
-    } catch (e: any) { setPulling((p) => ({ ...p, [name]: '✗ ' + String(e?.message || e) })); return false; }
-  }
-
-  function isPulled(name: string): boolean {
-    const all = [...(models?.local || []), ...(models?.cloud || [])];
-    const m = all.find((x) => x.name === name);
-    return m ? (m as any).pulled !== false : false;
-  }
 
   function submit(text: string) {
     if (!text.trim() || busy) return;
@@ -224,73 +153,6 @@ export default function Console() {
     }
     setInput(''); submit(t);
   }
-
-  async function installOllama() {
-    if (!window.confirm('Run the official Ollama installer on this machine?\n\ncurl -fsSL https://ollama.com/install.sh | sh')) return;
-    setInstallMsg('installing… (this can take a minute)');
-    try {
-      const r = await fetch('/api/install-ollama', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: 'install-ollama' }) });
-      const j = await r.json();
-      setInstallMsg(j.note || (j.ok ? '✓ installed' : '✗ failed'));
-      if (j.ok) await loadModels();
-    } catch (e: any) { setInstallMsg('✗ ' + String(e?.message || e)); }
-  }
-
-  // ── sAGI self-building ────────────────────────────────────────────────
-  const autonomousRef = useRef(autonomous); autonomousRef.current = autonomous;
-  const sagiRef = useRef(sagi); sagiRef.current = sagi;
-  useEffect(() => { if (!autonomous || !sagi) sagiStop.current = true; }, [autonomous, sagi]);
-
-  async function collectChat(system: string, userText: string): Promise<string> {
-    const res = await fetch('/api/chat', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ messages: [{ id: 's' + Date.now(), role: 'user', parts: [{ type: 'text', text: userText }] }], model, system, options: buildOptions(), think: false }),
-    });
-    if (!res.body) return '[no response]';
-    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '', text = '';
-    for (;;) {
-      const { done, value } = await reader.read(); if (done) break;
-      buf += dec.decode(value, { stream: true }); const lines = buf.split('\n'); buf = lines.pop() || '';
-      for (const line of lines) { if (!line.startsWith('data: ')) continue; try { const o = JSON.parse(line.slice(6)); if (o.type === 'text-delta') text += o.delta || ''; } catch {} }
-    }
-    return text.trim() || '[empty]';
-  }
-
-  // priorTitles is passed explicitly so the autonomous loop accumulates context
-  // across steps (React state is stale inside a running async loop). Returns the
-  // new module's title so the loop can extend its running list.
-  async function sagiBuildStep(operatorInput?: string, priorTitles?: string): Promise<string> {
-    const built = priorTitles ?? sagiLog.map((s) => s.title).join('; ');
-    const base = `You are building sAGI — a self-building, agnostic, modular scientific general intelligence — one module per step. Modules built so far: ${built || '(none)'}.`;
-    const ask = operatorInput
-      ? `${base}\nThe operator directs this step: "${operatorInput}". Specify this module: a short Title line, then a concise spec (purpose · interface · how it plugs into an agnostic core · how it advances self-building).`
-      : `${base}\nPropose and specify the NEXT single module (do not repeat a module already built): a short Title line, then a concise spec (purpose · interface · how it plugs into an agnostic core · how it advances self-building). Keep it modular and includable in any project (including as a Tauri app).`;
-    const priorCount = priorTitles !== undefined ? (priorTitles ? priorTitles.split(';').filter((s) => s.trim()).length : 0) : sagiLog.length;
-    const step = priorCount + 1;
-    const text = await collectChat(SAVANTE_PROMPT + SAGI_DIRECTIVE, ask);
-    const title = ((text.split('\n').find((l) => l.trim()) || 'Module')
-      .replace(/\*\*/g, '').replace(/^#+\s*|^title:\s*|^module\s*\d*\s*[:\-–]\s*/i, '').trim().slice(0, 90)) || 'Module';
-    setSagiLog((l) => [...l, { step: l.length + 1, title, body: text }]);
-    // Persist the module to the agnostic sagi/ package on disk (self-building architecture).
-    try {
-      const j = await (await fetch('/api/sagi', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ step, title, body: text }) })).json();
-      if (j.ok) setSagiDisk({ count: j.count, last: j.file });
-    } catch {}
-    return title;
-  }
-
-  async function runSagiLoop() {
-    if (sagiRunning) return;
-    setSagiRunning(true); sagiStop.current = false;
-    const titles = sagiLog.map((s) => s.title); // accumulates so each step sees prior modules
-    while (!sagiStop.current && autonomousRef.current && sagiRef.current && titles.length < SAGI_MAX_STEPS) {
-      const t = await sagiBuildStep(undefined, titles.join('; '));
-      titles.push(t);
-      await new Promise((r) => setTimeout(r, 600));
-    }
-    setSagiRunning(false);
-  }
-  function stopSagi() { sagiStop.current = true; setSagiRunning(false); }
 
   function regenerate() {
     if (busy || !messages.length) return;
@@ -330,28 +192,6 @@ export default function Console() {
   const [copied, setCopied] = useState<string | null>(null);
   async function copy(text: string, key: string) { try { await navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied(null), 1200); } catch {} }
 
-  // Avatar upload → resized data URL (kept small so localStorage stays happy).
-  function uploadAvatar(file: File | undefined, key: 'avatar' | 'botAvatar') {
-    if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const size = 128;
-        const c = document.createElement('canvas');
-        c.width = c.height = size;
-        const ctx = c.getContext('2d');
-        if (!ctx) { setPrefs((p) => ({ ...p, [key]: String(reader.result) })); return; }
-        // center-crop square
-        const s = Math.min(img.width, img.height);
-        ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
-        setPrefs((p) => ({ ...p, [key]: c.toDataURL('image/png') }));
-      };
-      img.src = String(reader.result);
-    };
-    reader.readAsDataURL(file);
-  }
-
   // Realtime feedback → self-improving codephreak.py engine (via /api/feedback).
   async function feedback(msg: any, rating: 'up' | 'down') {
     setFb((f) => ({ ...f, [msg.id]: rating }));
@@ -376,9 +216,6 @@ export default function Console() {
     } catch { setLearned([]); }
   }
 
-  const live = !!models?.ok;
-  const nModels = (models?.local.length || 0) + (models?.cloud.length || 0);
-  const isCloud = (n: string) => models?.cloud.some((m) => m.name === n);
   const sessionTokens = messages.reduce((a, m) => a + (metaOf(m).totalTokens || 0), 0);
   const lastAId = [...messages].reverse().find((m) => m.role === 'assistant')?.id;
 
@@ -764,8 +601,8 @@ export default function Console() {
             </div>
             <div className="savebar">
               <button className="btn primary" onClick={savePrefs} disabled={!prefsDirty}>{prefsDirty ? 'Save preferences' : '✓ Saved'}</button>
-              <button className="btn ghost sm" onClick={() => setPrefs(savedPrefs)} disabled={!prefsDirty}>Revert</button>
-              <button className="btn ghost sm" onClick={() => setPrefs(PREFS_DEFAULT)}>Reset to defaults</button>
+              <button className="btn ghost sm" onClick={revertPrefs} disabled={!prefsDirty}>Revert</button>
+              <button className="btn ghost sm" onClick={resetPrefs}>Reset to defaults</button>
               <span className="spacer" />
               <span className={'savestate ' + (prefsDirty ? 'dirty' : 'clean')}>
                 {prefsDirty ? '● unsaved changes — press Enter to save' : '✓ all changes saved'}
