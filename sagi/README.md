@@ -78,3 +78,21 @@ host.memory.tree_at_moment(ts)           # the exact memory state at a .history 
 `boot()` commits a snapshot on every `module.persisted` event, so the memory tree
 and `.history/build.jsonl` stay aligned by timestamp. The object store is runtime
 state (git-ignored).
+
+## Sandbox & governance
+
+Every sAGI builds inside its **own `SAGI_DIR`** — a sandbox. The `self-package-boundary`
+seed module (*do no harm*) refuses any write that escapes the package, so a build is
+sandboxed by construction:
+
+```bash
+SAGI_DIR=/path/to/box python3 sagi_build.py --backend ollama --steps 3   # writes only inside the box
+```
+
+**Edit governance** (`sagi/runtime/governance.py`) layers on top of spawning:
+
+- a sAGI may edit **itself** and its **subordinate (sub)** descendants;
+- a **sovereign (sov)** sAGI is self-governing — only it may edit itself and its own
+  subtree; a parent may **not** reach across the sovereignty boundary.
+
+`can_edit(actor, target)` / `assert_can_edit(...)` / `governed_write(...)` enforce it.
