@@ -88,7 +88,7 @@ export default function Console() {
   const [showTerm, setShowTerm] = useState(false);      // Claude terminal popup
   const termSendRef = useRef<((s: string) => void) | null>(null);
   const [sagiChooser, setSagiChooser] = useState(false); // "how many interactions?" prompt
-  const [sagiSteps, setSagiSteps] = useState(() => { try { return Math.min(20, Math.max(1, Number(localStorage.getItem('cpk.sagiSteps')) || 3)); } catch { return 3; } });
+  const [sagiSteps, setSagiSteps] = useState(() => { try { return Math.min(1000, Math.max(1, Number(localStorage.getItem('cpk.sagiSteps')) || 10)); } catch { return 10; } });
   useEffect(() => { try { localStorage.setItem('cpk.sagiSteps', String(sagiSteps)); } catch { /* ignore */ } }, [sagiSteps]);
   const [sagiGoal, setSagiGoal] = useState('');
   const shq = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'";   // safe single-quote for the shell
@@ -138,7 +138,7 @@ export default function Console() {
 
   const { running: sagiRunning, log: sagiLog, setLog: setSagiLog, disk: sagiDisk, loadDisk: loadSagiDisk,
     buildStep: sagiBuildStep, runLoop: runSagiLoop, stopLoop: stopSagi, maxSteps: SAGI_MAX_STEPS } =
-    useSagi({ collectChat, savante: SAVANTE_PROMPT, directive: SAGI_DIRECTIVE, autonomous, sagi });
+    useSagi({ collectChat, savante: SAVANTE_PROMPT, directive: SAGI_DIRECTIVE, autonomous, sagi, maxSteps: 1000 });
 
   // boot: restore page-specific persisted state (prefs/models handled in hooks)
   useEffect(() => {
@@ -298,23 +298,23 @@ export default function Console() {
       <div className="chooser-overlay" onMouseDown={() => setSagiChooser(false)}>
         <div className="chooser" onMouseDown={(e) => e.stopPropagation()}>
           <h3>⚛ Start sAGI build</h3>
-          <p className="dim small">Claude drives the self-build. How many interactions (a step = one input→response)?</p>
+          <p className="dim small">Pick how many interactions to build (a step = one input→response). Each step advances toward the goal.</p>
           <div className="chooser-steps">
-            <button className="btn ghost icon" onClick={() => setSagiSteps((s) => Math.max(1, s - 1))}>−</button>
-            <div className="chooser-n">{sagiSteps}<span className="dim small"> steps</span></div>
-            <button className="btn ghost icon" onClick={() => setSagiSteps((s) => Math.min(20, s + 1))}>+</button>
+            <button className="btn ghost icon" onClick={() => setSagiSteps((s) => Math.max(1, s - (s > 200 ? 100 : s > 20 ? 10 : 1)))}>−</button>
+            <div className="chooser-n">{sagiSteps.toLocaleString()}<span className="dim small"> {sagiSteps === 1 ? 'goal' : 'goals'}</span></div>
+            <button className="btn ghost icon" onClick={() => setSagiSteps((s) => Math.min(1000, s + (s >= 200 ? 100 : s >= 20 ? 10 : 1)))}>+</button>
           </div>
           <div className="chooser-presets">
-            {[1, 3, 5, 10].map((n) => <button key={n} className={'btn sm' + (sagiSteps === n ? ' primary' : ' ghost')} onClick={() => setSagiSteps(n)}>{n}</button>)}
+            {[10, 100, 1000].map((n) => <button key={n} className={'btn' + (sagiSteps === n ? ' primary' : ' ghost')} onClick={() => setSagiSteps(n)}>{n.toLocaleString()}</button>)}
           </div>
           <input className="chooser-goal" placeholder="Goal (optional) — what should sAGI build toward?" value={sagiGoal} onChange={(e) => setSagiGoal(e.target.value)} />
           <div className="chooser-actions">
-            <button className="btn primary" onClick={() => launchSagi('steps')}>▶ Build {sagiSteps} step{sagiSteps > 1 ? 's' : ''}</button>
-            <button className="btn" onClick={() => launchSagi('auto')} title="continuous self-build until you Ctrl-C in the terminal">∞ Autonomous</button>
+            <button className="btn primary" onClick={() => launchSagi('steps')}>▶ Build {sagiSteps.toLocaleString()} {sagiSteps === 1 ? 'goal' : 'goals'}</button>
           </div>
           <div className="chooser-actions">
             <button className="btn ghost sm" onClick={() => launchSagi('plan')} title="ask Claude for an ultracode plan first — no build">⌖ /plan ultracode</button>
             <button className="btn ghost sm" onClick={() => launchSagi('goal')} disabled={!sagiGoal.trim()} title="set this as sAGI's standing goal (persists to sagi/goal.txt)">◎ /goal</button>
+            <button className="btn ghost sm" onClick={() => launchSagi('auto')} title="unbounded continuous self-build until you Ctrl-C in the terminal">∞ autonomous</button>
             <button className="btn ghost sm" onClick={() => setSagiChooser(false)}>Cancel</button>
           </div>
           <p className="dim small" style={{ marginTop: 4 }}>Runs in the ⌘ Terminal (needs <span className="mono">claude</span> signed in). Watch it grow below.</p>
