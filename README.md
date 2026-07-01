@@ -98,8 +98,10 @@ python3 uiux.py \
   --save_history
 ```
 
-> **Note.** The legacy paths load the model in-process; inputs larger than 4096
-> characters can crash the original GGML model. Prefer `ollama_codephreak.py`.
+> **Note.** The original model has a hard 4096-token context. The token-aware
+> sliding window in `context4096.py` (wired into `hfUIUX.py`) fixes the old
+> overflow crash; modern models via Ollama sidestep it entirely with a larger
+> `num_ctx`. See **[CONTEXT.md](CONTEXT.md)**.
 
 ---
 
