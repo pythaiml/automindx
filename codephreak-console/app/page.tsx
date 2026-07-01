@@ -152,7 +152,7 @@ export default function Console() {
   }
 
   const { running: sagiRunning, log: sagiLog, setLog: setSagiLog, disk: sagiDisk, loadDisk: loadSagiDisk,
-    buildStep: sagiBuildStep, runLoop: runSagiLoop, stopLoop: stopSagi, maxSteps: SAGI_MAX_STEPS } =
+    buildStep: sagiBuildStep, runLoop: runSagiLoop, stopLoop: stopSagi, maxSteps: SAGI_MAX_STEPS, ataraxia: sagiAtaraxia } =
     useSagi({ collectChat, savante: SAVANTE_PROMPT, directive: SAGI_DIRECTIVE, autonomous, sagi, maxSteps: 1024, target: sagiSteps });
 
   // boot: restore page-specific persisted state (prefs/models handled in hooks)
@@ -521,7 +521,8 @@ export default function Console() {
                 </div>
               )}
               {!autonomous && <div className="notice" style={{ marginBottom: 12 }}>Autonomous is off — sAGI builds one module per input/response. Turn <b>Autonomous</b> on (Preferences) for a continuous self-building loop.</div>}
-              {sagiRunning && <div className="notice" style={{ marginBottom: 12 }}><span className="spin" /> building with {model} — {sagiLog.length}/{sagiSteps.toLocaleString()} iterations. Stops if you turn Autonomous off.</div>}
+              {sagiRunning && <div className="notice" style={{ marginBottom: 12 }}><span className="spin" /> building with {model} — {sagiLog.length}/{sagiSteps.toLocaleString()} iterations. Stops if you turn Autonomous off, or at Ataraxia (convergence).</div>}
+              {!sagiRunning && sagiAtaraxia && <div className="notice" style={{ marginBottom: 12, color: 'var(--accent)' }}>⊙ <b>Ataraxia reached</b> ({sagiAtaraxia}) — sAGI converged to perfection; the circuit breaker stopped the continuous build. Consider a ⭑ Save point.</div>}
               {sagiLog.length === 0 ? <div className="dim small">No modules yet. {autonomous ? 'Press “Begin autonomous build”.' : 'Direct the first build step above.'}</div> : (
                 <div className="sagilog">
                   {sagiLog.map((s) => (

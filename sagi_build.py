@@ -54,6 +54,20 @@ def read_goal() -> str:
         return ""
 
 
+# Ataraxia circuit breaker — for continuous builds, perfection is Ataraxia: stop
+# when the architecture reaches "done" / "ready" (converged, nothing new) or a
+# "time" bound, rather than over-building past perfection.
+ATARAXIA_PATIENCE = int(os.environ.get("SAGI_ATARAXIA_PATIENCE", "3"))   # consecutive no-new → done
+ATARAXIA_SECONDS = float(os.environ.get("SAGI_ATARAXIA_SECONDS", "0"))   # >0 → time breaker
+_DONE_RE = re.compile(
+    r"\b(ataraxia|no further modules?|nothing (?:left|more) to build|"
+    r"the system is complete|architecture (?:is )?complete|feature[- ]complete|done and ready)\b", re.I)
+
+
+def _norm_title(t: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (t or "").lower()).strip()
+
+
 def log_history(event: dict) -> None:
     try:
         os.makedirs(HISTORY_DIR, exist_ok=True)
@@ -154,6 +168,7 @@ def build_step(model: str, backend: str = None) -> dict:
     """One PODA-style step: propose → specify → persist."""
     manifest = read_manifest()
     built = "; ".join(m["title"] for m in manifest["modules"]) or "(none)"
+    prior_norm = {_norm_title(m["title"]) for m in manifest["modules"]}
     prompt = (
         f"Modules built so far: {built}.\n"
         "Propose and specify the NEXT single module (do not repeat one already "
@@ -181,22 +196,43 @@ def build_step(model: str, backend: str = None) -> dict:
         f.write("\n")
     log_history({"event": "module", "step": step, "title": title, "file": fname, "backend": backend or BACKEND})
     print(f"  ✓ step {step}: {title}  → sagi/modules/{fname}")
-    return {"success": True, "step": step, "title": title}
+    return {"success": True, "step": step, "title": title,
+            "redundant": _norm_title(title) in prior_norm,     # nothing new → converging
+            "done": bool(_DONE_RE.search(text))}                # the build signalled completion
 
 
 def build(model: str, steps: int, backend: str = None) -> None:
     print(f"sAGI headless build · backend={backend or BACKEND} · model={model} · {steps} step(s) → {SAGI_DIR}")
     log_history({"event": "run_start", "backend": backend or BACKEND, "model": model, "steps": steps})
     done = 0
+    calm = 0            # consecutive no-new (redundant) steps
+    t0 = time.time()
     for _ in range(steps):
         try:
-            build_step(model, backend)
+            r = build_step(model, backend)
             done += 1
         except Exception as e:
             print(f"  ✗ step failed: {e}")
             log_history({"event": "error", "detail": str(e)[:200]})
             break
+        calm = calm + 1 if r.get("redundant") else 0
+        reason = ataraxia(r, calm, t0)
+        if reason:
+            log_history({"event": "ataraxia", "reason": reason, "built": done})
+            print(f"  ⊙ Ataraxia reached ({reason}) — sAGI has converged to perfection; circuit breaker tripped.")
+            break
     log_history({"event": "run_end", "built": done})
+
+
+def ataraxia(result: dict, calm: int, t0: float):
+    """Return the trip reason if perfection (Ataraxia) is reached, else None."""
+    if result.get("done"):
+        return "ready"                                  # the build signalled it is done/ready
+    if calm >= ATARAXIA_PATIENCE:
+        return "done"                                   # converged — nothing new to build
+    if ATARAXIA_SECONDS and (time.time() - t0) > ATARAXIA_SECONDS:
+        return "time"                                   # time bound reached
+    return None
 
 
 async def build_loop(model: str, steps: int, interval: float = 2.0, backend: str = None) -> None:
@@ -204,23 +240,32 @@ async def build_loop(model: str, steps: int, interval: float = 2.0, backend: str
     from aglm import AGLMCore, AutonomousLoop, Decision, PerceptionContext
 
     remaining = {"n": steps}
+    state = {"calm": 0, "t0": time.time(), "ataraxia": None}   # Ataraxia circuit breaker
 
     async def perceive() -> PerceptionContext:
         return PerceptionContext(facts={"built": len(read_manifest()["modules"])}, source="sagi")
 
     async def decide(ctx, beliefs) -> Decision:
-        return Decision(action="build" if remaining["n"] > 0 else "stop")
+        if state["ataraxia"] or remaining["n"] <= 0:
+            return Decision(action="stop")
+        return Decision(action="build")
 
     async def act(d: Decision) -> dict:
         if d.action == "stop":
             return {"success": True, "done": True}
         remaining["n"] -= 1
-        return build_step(model, backend)
+        r = build_step(model, backend)
+        state["calm"] = state["calm"] + 1 if r.get("redundant") else 0
+        state["ataraxia"] = ataraxia(r, state["calm"], state["t0"])
+        if state["ataraxia"]:
+            log_history({"event": "ataraxia", "reason": state["ataraxia"]})
+            print(f"  ⊙ Ataraxia reached ({state['ataraxia']}) — circuit breaker tripped.")
+        return r
 
     core = AGLMCore(perceive=perceive, decide=decide, act=act, agent_id="sagi.builder")
     loop = AutonomousLoop(core, interval_seconds=interval)
     await loop.start()
-    while remaining["n"] > 0:
+    while remaining["n"] > 0 and not state["ataraxia"]:
         await asyncio.sleep(interval)
     await loop.stop()
 
