@@ -149,7 +149,16 @@ export default function Console() {
   // Persistent sAGI sub-tabs: each saved sAGI (a point of save) becomes its own tab.
   const [sagiSaves, setSagiSaves] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('cpk.sagiSaves') || '[]'); } catch { return []; } });
   useEffect(() => { try { localStorage.setItem('cpk.sagiSaves', JSON.stringify(sagiSaves.slice(0, 30))); } catch { /* ignore */ } }, [sagiSaves]);
-  const [sagiSub, setSagiSub] = useState('overview');   // 'overview' | a save id
+  const [sagiSub, setSagiSub] = useState('overview');   // 'overview' | a save id | 'inst:<dir>'
+  const [sagiInstances, setSagiInstances] = useState<any[]>([]);   // spawned sAGI on disk
+  const loadSagiInstances = async () => { try { const j = await (await fetch('/api/sagi/instances')).json(); if (j.ok) setSagiInstances(j.instances); } catch { /* none */ } };
+  const [sagiInstView, setSagiInstView] = useState<any>(null);
+  useEffect(() => {
+    if (!sagiSub.startsWith('inst:')) { setSagiInstView(null); return; }
+    const dir = sagiSub.slice(5);
+    (async () => { try { const j = await (await fetch('/api/sagi?dir=' + encodeURIComponent(dir))).json(); setSagiInstView({ dir, ...j, inst: sagiInstances.find((i) => i.dir === dir) }); } catch { setSagiInstView(null); } })();
+    /* eslint-disable-next-line */
+  }, [sagiSub, sagiInstances.length]);
   async function savePoint() {
     setSavingPt(true);
     try {
@@ -235,7 +244,7 @@ export default function Console() {
   };
   useEffect(() => {
     if (tab !== 'sagi' && !sagiRunning) return;
-    const tick = () => { loadSagiDisk(); loadSagiHistory(); };
+    const tick = () => { loadSagiDisk(); loadSagiHistory(); loadSagiInstances(); };
     tick();
     const iv = setInterval(tick, 1500);
     return () => clearInterval(iv);
@@ -544,6 +553,12 @@ export default function Console() {
             <p className="lead">sAGI is a self-building, agnostic, modular scientific general intelligence grown from the <b>Savante</b> persona. It builds itself one module per step using the chosen model — <b className="mono">{model}</b>. Modules are scaffolded into the agnostic <span className="mono">sagi/</span> package for inclusion in any project (including as a Tauri app).</p>
             <div className="sagi-subtabs">
               <span className={'sagi-subtab' + (sagiSub === 'overview' ? ' active' : '')} onClick={() => setSagiSub('overview')}>◈ sAGI</span>
+              {sagiInstances.map((i) => (
+                <span key={i.dir} className={'sagi-subtab' + (sagiSub === 'inst:' + i.dir ? ' active' : '') + (i.sovereign ? ' sov' : '')} onClick={() => setSagiSub('inst:' + i.dir)}
+                  style={{ marginLeft: i.depth * 12 }} title={`${i.sovereign ? 'sovereign' : 'subordinate'} · grown from ${i.grown_from} · ${i.modules} module(s)`}>
+                  {i.sovereign ? '♛' : '⬡'} {i.name}<span className="dim small"> {i.modules}</span>
+                </span>
+              ))}
               {sagiSaves.map((s) => (
                 <span key={s.id} className={'sagi-subtab' + (sagiSub === s.id ? ' active' : '')} onClick={() => setSagiSub(s.id)} title={`gitmind ${s.id} · ${s.modules} module(s)`}>
                   ⭑ {s.label}
@@ -617,6 +632,34 @@ export default function Console() {
                 </div>
               )}
             </div>
+            ) : sagiSub.startsWith('inst:') ? (
+              (() => {
+                const iv = sagiInstView; const inst = iv?.inst;
+                if (!iv) return <div className="card dim small">loading sAGI…</div>;
+                return (
+                  <div className="card">
+                    <div className="row" style={{ marginBottom: 10 }}>
+                      <span className={'badge ' + (inst?.sovereign ? 'on' : '')}>{inst?.sovereign ? '♛ sovereign' : '⬡ subordinate'} sAGI · {inst?.name || iv.name}</span>
+                      <span className="badge">{iv.count} module(s)</span>
+                      {inst?.grown_from && <span className="badge">grown from {inst.grown_from}</span>}
+                      <span className="spacer" />
+                      <span className="dim small mono">{iv.dir}</span>
+                    </div>
+                    {inst?.individual && <p className="lead" style={{ marginTop: 0 }}><b>Individuality:</b> {inst.individual}</p>}
+                    <div className="dim small" style={{ marginBottom: 8 }}>Governed by <b>{inst?.grown_from}</b>{inst?.sovereign ? ' — sovereign: only it may edit itself' : ' — its parent may edit it'}. Persists on disk at <span className="mono">sagi/{iv.dir}</span>.</div>
+                    {iv.count === 0 ? <div className="dim small">No modules yet.</div> : (
+                      <div className="sagilog">
+                        {iv.modules.map((m: any) => (
+                          <div className="sagimod" key={m.file}>
+                            <div className="sagihead"><span className="sagistep">{m.step}</span><b>{m.title}</b></div>
+                            <div className="sagibody"><ReactMarkdown remarkPlugins={[remarkGfm]}>{m.body || ''}</ReactMarkdown></div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
             ) : (() => {
               const sv = sagiSaves.find((s) => s.id === sagiSub);
               if (!sv) return <div className="card dim small">saved sAGI not found.</div>;

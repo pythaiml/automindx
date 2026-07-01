@@ -463,3 +463,5 @@ h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -.01em; }
 .term-claude { border: 1px solid rgba(46,230,166,.4); background: linear-gradient(180deg, rgba(46,230,166,.14), rgba(46,230,166,.05));
   color: var(--accent); font-size: 11.5px; font-family: var(--mono); padding: 3px 10px; border-radius: 8px; cursor: pointer; margin-right: 6px; }
 .term-claude:hover { background: rgba(46,230,166,.22); box-shadow: 0 0 12px -2px var(--accent); }
+.sagi-subtab.sov { border-color: rgba(245,196,81,.4); }
+.sagi-subtab.sov.active { color: var(--gold); border-color: rgba(245,196,81,.6); background: linear-gradient(180deg, rgba(245,196,81,.12), transparent); }
