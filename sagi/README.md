@@ -1,5 +1,9 @@
 # sagi — self-building, agnostic, modular scientific general intelligence
 
+> **Start here:** [POINT_OF_DEPARTURE.md](POINT_OF_DEPARTURE.md) — the canonical
+> fork-point for an individual sAGI (seed structure, self-build protocol, and how
+> individuality layers on the Savante / sAGI templates).
+
 `sagi` is an **agnostic, modular** scaffold that any project can include. It is
 grown from the **Savante** persona inside automindX and built one module at a
 time by an **autonomous loop** driving a chosen model. Each build step proposes
