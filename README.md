@@ -8,10 +8,10 @@
 secure, modular programming — as a local, persona-driven language-model
 environment. Project codename: **codephreak**.
 
-[![Loads instantly](https://img.shields.io/badge/UI-loads%20instantly-4b9)](TECHNICAL.md)
-[![Models](https://img.shields.io/badge/models-Ollama%20local%20%2B%20cloud-000)](TECHNICAL.md)
+[![Loads instantly](https://img.shields.io/badge/UI-loads%20instantly-4b9)](docs/TECHNICAL.md)
+[![Models](https://img.shields.io/badge/models-Ollama%20local%20%2B%20cloud-000)](docs/TECHNICAL.md)
 [![Gradio](https://img.shields.io/badge/UI-Gradio-f97316)](https://gradio.app)
-[![audit](https://img.shields.io/badge/audit-AUDIT.md-blue)](AUDIT.md)
+[![audit](https://img.shields.io/badge/audit-AUDIT.md-blue)](docs/AUDIT.md)
 
 </div>
 
@@ -37,8 +37,9 @@ python3 ollama_codephreak.py             # → http://localhost:7860
 > cognitive console (Socratic, Logic, BDI, MASTERMIND, …) and an AI-SDK streaming
 > participant UI live at **[GATERAGE/aglm](https://github.com/GATERAGE/aglm)**.
 
-📖 **[TECHNICAL.md](TECHNICAL.md)** — module map & entrypoints &nbsp;·&nbsp;
-🔧 **[AUDIT.md](AUDIT.md)** — audit findings & fixes
+📚 **[docs/NAV.md](docs/NAV.md)** — full documentation index &nbsp;·&nbsp;
+📖 **[TECHNICAL.md](docs/TECHNICAL.md)** — module map & entrypoints &nbsp;·&nbsp;
+🔧 **[AUDIT.md](docs/AUDIT.md)** — audit findings & fixes
 
 ---
 
@@ -46,19 +47,23 @@ python3 ollama_codephreak.py             # → http://localhost:7860
 
 | Path | File | Loads | Requires |
 |---|---|---|---|
-| **AI SDK console (definitive)** | `codephreak-console/` + `codephreak.py` | **instantly** | Ollama + Node (see [CODEPHREAK_CONSOLE.md](CODEPHREAK_CONSOLE.md)) |
+| **AI SDK console (definitive)** | `codephreak-console/` + `codephreak.py` | **instantly** | Ollama + Node (see [CODEPHREAK_CONSOLE.md](docs/CODEPHREAK_CONSOLE.md)) |
 | Modern Gradio | `ollama_codephreak.py` | **instantly** | a running Ollama daemon |
 | Legacy GGML (CPU) | `hfapp.py` | after model download | `llama-cpp-python` + ~4 GB model |
 | Legacy transformers | `uiux.py` / `hfUIUX.py` | after model load | `torch` + `transformers` |
 
-The **[Professor Codephreak AI SDK console](CODEPHREAK_CONSOLE.md)** is the
+The **[Professor Codephreak AI SDK console](docs/CODEPHREAK_CONSOLE.md)** is the
 flagship UI: streaming chat on the Vercel AI SDK v7 with gpt-oss by default,
-reasoning, a token counter, advanced **and** scientific sampling, a `.persona`
-creator (Codephreak, automindX, jAImla, Savante, …), `.history`, export/copy, and
-a self-improving feedback loop (`codephreak.py`).
+reasoning, a **live token / tok-s** counter, advanced **and** scientific sampling,
+a `.persona` creator (Codephreak, automindX, jAImla, Savante, …), `.history`,
+export/copy, ❤/💔 feedback into the self-improving `codephreak.py`, and a living
+WebGL substrate that fluxes while thinking. codephreak also has **read-only
+filesystem access** (tool-calling: `list_files`/`read_file`/`grep`) so it answers
+about the *actual* code, and **decomposes large tasks into sub-tasks** completed
+one at a time.
 
 ```bash
-./run_codephreak_console.sh      # engine :5001 + console :3100
+./scripts/run_codephreak_console.sh      # engine :5001 + console :3100
 ```
 
 ## Modules
@@ -67,24 +72,30 @@ a self-improving feedback loop (`codephreak.py`).
 
 | Module | Responsibility |
 |---|---|
-| `uiux.py` | Gradio interface: captures input, streams the model's response, manages memory. |
-| `automind.py` | The codephreak persona and `format_to_llama_chat_style` — renders history into Llama-2 chat format. |
-| `memory.py` | Conversation memory — saves, loads, and exports `./memory/*.json` (`instruction` / `response`). |
-| `llama_model.py` | `LlamaModel` — loads a local dir **or** a Hugging Face id (`device_map="auto"`) and generates. *(was `aglm.py`)* |
-| `ollama_codephreak.py` | Modern Ollama-backed chat with model picker + token counter. |
-| `aglm/` | The **Autonomous General Learning Model** package (PODA cycle · beliefs · autonomous loop), migrated from [GATERAGE/aglm](https://github.com/GATERAGE/aglm). See [AGLM.md](AGLM.md). |
+| **`services/`** | The decoupled service layer (see **[SERVICES.md](docs/SERVICES.md)**): `MemoryService` (SQLite) · `RageMemory` (pgvector/pgvectorscale) · `get_memory()` factory · `ModelService` (lazy Ollama client) · `InferenceOrchestrator` (sanitize → RAG recall → infer → persist → JSON logs) · `ModelRegistry` (versioned config + digest integrity) · `secrets` (keyring→env) · **`self_audit`** (codephreak reads the real source). |
+| `automind.py` | Thin façade — `chat(user_input, session_id)` delegates to the service layer; also exports the codephreak persona + `format_to_llama_chat_style`. |
+| `codephreak.py` | Self-improving persona engine — learns directives from realtime 👍/👎 feedback (`GET /healthz`, `POST /feedback`). |
+| `memory.py` | Legacy JSON conversation memory (`./memory/*.json`); the service layer uses SQLite/pgvector. |
+| `llama_model.py` | `LlamaModel` — loads a local dir **or** a Hugging Face id (`device_map="auto"`). *(was `aglm.py`)* |
+| `ollama_codephreak.py` | Modern Ollama-backed Gradio chat with model picker + token counter. |
+| `aglm/` | The **Autonomous General Learning Model** package (PODA cycle · beliefs · autonomous loop), migrated from [GATERAGE/aglm](https://github.com/GATERAGE/aglm). See [AGLM.md](docs/AGLM.md). |
 | `automind_aglm.py` | Wires aGLM to codephreak's feedback so automindX self-refines its persona. |
+
+> **Reality note.** automindX runs models in the **Ollama daemon** (local + free
+> `:cloud`), not an in-process torch checkpoint. Self-improvement is prompt-space
+> (feedback → learned directives), not weight-space training. The service layer,
+> registry, secrets, and self-audit are real and tested (`python3 -m pytest`).
 
 ---
 
 ## Install
 
-The [`automindx.install`](https://github.com/pythaiml/automindx/blob/main/automindx.install)
+The [`scripts/automindx.install`](https://github.com/pythaiml/automindx/blob/main/scripts/automindx.install)
 script sets up the full environment (tested on Ubuntu 22.04, Linux Mint 21.2, and
 Mandrake Linux):
 
 ```bash
-chmod +x automindx.install && ./automindx.install
+chmod +x scripts/automindx.install && ./scripts/automindx.install
 ```
 
 ## Legacy GGML run
@@ -103,7 +114,7 @@ python3 uiux.py \
 > **Note.** The original model has a hard 4096-token context. The token-aware
 > sliding window in `context4096.py` (wired into `hfUIUX.py`) fixes the old
 > overflow crash; modern models via Ollama sidestep it entirely with a larger
-> `num_ctx`. See **[CONTEXT.md](CONTEXT.md)**.
+> `num_ctx`. See **[CONTEXT.md](4096/CONTEXT.md)**.
 
 ---
 
