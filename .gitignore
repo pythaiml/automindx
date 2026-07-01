@@ -28,3 +28,6 @@ sagi/modules/*.md
 # service-layer runtime
 memory/*.db
 *.db
+
+# sAGI read/write history (runtime log)
+sagi/.history/
