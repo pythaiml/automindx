@@ -76,6 +76,17 @@ const reasonOf = (m: any) => (m?.parts || []).filter((p: any) => p.type === 'rea
 const estTok = (m: any) => Math.max(0, Math.ceil((reasonOf(m).length + textOf(m).length) / 4));
 const metaOf = (m: any): Meta => (m?.metadata as Meta) || {};
 
+// Starter-question pools (persona-aware). The first 3 are used deterministically
+// for SSR; the client shuffles + folds in memory after mount (see the effect).
+const SUGGEST_POOL: Record<'sagi' | 'codephreak', string[]> = {
+  sagi: ['What module should sAGI build next?', 'Extend the module-registry kernel with a health check.',
+    'Design an agnostic memory adapter for sAGI.', 'Propose a self-healing check for the build loop.',
+    'How should sAGI persist identity across hosts?', 'What is the smallest next step toward the goal?'],
+  codephreak: ['Write a production-ready Python rate limiter with tests.', 'Design a secure JWT auth flow — modular and concise.',
+    'Explain the BDI agent model, step by step.', 'Audit this repo for the top security risks.',
+    'Refactor a callback pyramid into async/await.', 'Design an idempotent job queue with backpressure.'],
+};
+
 export default function Console() {
   const [tab, setTab] = useState('chat');
   const [think, setThink] = useState(true);
@@ -337,27 +348,25 @@ export default function Console() {
   // Opening questions evolve: memory-derived (built sAGI modules, recent chats)
   // takes priority, filling the rest from a shuffled random pool — so they drift
   // from random toward relevant as memory accumulates. Persona-aware.
-  const SUGGEST = useMemo(() => {
-    const isSagi = sagi || activePersona === 'savante' || activePersona === 'sagi';
-    const pool = isSagi
-      ? ['What module should sAGI build next?', 'Extend the module-registry kernel with a health check.',
-         'Design an agnostic memory adapter for sAGI.', 'Propose a self-healing check for the build loop.',
-         'How should sAGI persist identity across hosts?', 'What is the smallest next step toward the goal?']
-      : ['Write a production-ready Python rate limiter with tests.', 'Design a secure JWT auth flow — modular and concise.',
-         'Explain the BDI agent model, step by step.', 'Audit this repo for the top security risks.',
-         'Refactor a callback pyramid into async/await.', 'Design an idempotent job queue with backpressure.'];
+  // NOTE: the first 3 of the pool are used for SSR/first render (deterministic — no
+  // Math.random) to avoid a hydration mismatch; the evolved set is applied after
+  // mount in the effect below (client-only).
+  const isSagiPersona = sagi || activePersona === 'savante' || activePersona === 'sagi';
+  const [SUGGEST, setSuggest] = useState<string[]>(() => SUGGEST_POOL[isSagiPersona ? 'sagi' : 'codephreak'].slice(0, 3));
+  useEffect(() => {
+    const pool = SUGGEST_POOL[isSagiPersona ? 'sagi' : 'codephreak'];
     const relevant: string[] = [];
     const mods = sagiDisk.modules || [];
-    if (isSagi && mods.length) {
+    if (isSagiPersona && mods.length) {
       relevant.push(`Continue sAGI from “${mods[mods.length - 1].title}”.`);
       if (mods.length > 1) relevant.push(`Audit the “${mods[mods.length - 1].title}” module and harden it.`);
     }
     const recent = sessions.find((s) => s.title && s.title !== 'Conversation');
     if (recent) relevant.push(`Continue: ${recent.title}`);
     const rnd = [...pool].sort(() => Math.random() - 0.5);
-    return Array.from(new Set([...relevant, ...rnd])).slice(0, 3);
+    setSuggest(Array.from(new Set([...relevant, ...rnd])).slice(0, 3));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sagi, activePersona, sagiDisk.count, sessions.length]);
+  }, [isSagiPersona, sagiDisk.count, sessions.length]);
 
   const sub = PERSONA_SUBSTRATE[sagi ? 'savante' : activePersona] || PERSONA_SUBSTRATE.codephreak;
   return (
