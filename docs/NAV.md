@@ -12,6 +12,10 @@ Navigation for all project docs. (Start at the [README](../README.md).)
 - [SERVICES.md](SERVICES.md) — the `services/` layer (memory · model · orchestrator · registry · secrets · self-audit)
 - [AGLM.md](AGLM.md) — the migrated Autonomous General Learning Model package
 
+## sAGI
+- [../sagi/POINT_OF_DEPARTURE.md](../sagi/POINT_OF_DEPARTURE.md) — the canonical sAGI point of departure (seed + self-build protocol + individuality)
+- [../sagi/README.md](../sagi/README.md) — the agnostic sAGI package
+
 ## Audit & fixes
 - [CODEPHREAK_AUDIT.md](CODEPHREAK_AUDIT.md) — audit to Professor Codephreak standards
 - [AUDIT.md](AUDIT.md) — the original code-audit pass (bug fixes)
