@@ -52,3 +52,29 @@ and can be exported. Turning **Autonomous off** stops the continuous loop.
 >
 > Both hosts write the same `modules/` + `manifest.json`, proving sagi is
 > orchestrator-agnostic.
+
+## Memory grows as a tree — gitmind
+
+Each individual sAGI grows an internal, content-addressed memory tree
+(`sagi/runtime/gitmind.py`): every persisted moment snapshots `modules/` into
+blobs → a tree → a commit chained to its parent, under `<SAGI_DIR>/.gitmind/`. It
+is the in-package, server-less analogue of a self-hosted forge (**Forgejo**) and of
+mindX's **`/mindx/gitmind`** — so memory can be revisited from any moment in
+`.history`. It ports **[Professor-Codephreak/gitmind](https://github.com/Professor-Codephreak/gitmind)**
+and adds two commit tiers:
+
+- **local** — the per-timestamp timeline (**vertical scaling**: this individual
+  deepening over time); the default, deduped on no-op.
+- **global** — reserved for expansion & massive-upgrade moves (**horizontal
+  scaling**), walkable on its own `GLOBAL` chain via `global_log()`.
+
+```python
+from sagi.runtime import boot
+host, _ = boot(SAGI_DIR)                 # host.memory is the gitmind tree
+host.memory.log()                        # commits, newest first
+host.memory.tree_at_moment(ts)           # the exact memory state at a .history timestamp
+```
+
+`boot()` commits a snapshot on every `module.persisted` event, so the memory tree
+and `.history/build.jsonl` stay aligned by timestamp. The object store is runtime
+state (git-ignored).

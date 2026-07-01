@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Callable, Dict, Optional, Tuple
 
 from .host import Host
+from .gitmind import GitMind
 from .modules import SEED
 
 
@@ -15,9 +16,11 @@ def boot(sagi_dir: str, call_model: Optional[Callable[[str, str], str]] = None) 
     """Activate the three seed modules in ship order and register them in the kernel.
 
     be thyself (1) -> do no harm (2) -> grow thyself (3). Returns the live host and
-    the module handles keyed by id.
+    the module handles keyed by id. The host also grows a gitmind memory tree that
+    snapshots each persisted moment, so memory is reachable from any .history moment.
     """
     host = Host(sagi_dir, call_model=call_model)
+    host.memory = GitMind(host.root)          # git-like internal memory tree
     host.log("run_start", runtime="sagi.runtime")
     handles: Dict[str, dict] = {}
     for mod in SEED:                          # 1 -> 2 -> 3
@@ -25,6 +28,11 @@ def boot(sagi_dir: str, call_model: Optional[Callable[[str, str], str]] = None) 
     registry = handles["module-registry"]
     for mod in SEED:                          # every seed becomes a live registered module
         registry["register"](mod.MODULE_ID, handles[mod.MODULE_ID], {"deps": mod.DEPS, "motto": mod.MOTTO})
+    # every persisted moment is a LOCAL snapshot, chained to .history by timestamp.
+    host.on("module.persisted", lambda p: host.memory.commit(
+        moment={"event": "module.persisted", **(p or {})}, message=(p or {}).get("id", "")))
+    # genesis is a GLOBAL milestone (the first expansion of this individual).
+    host.memory.global_commit(moment={"event": "boot"}, message="seed")
     host.log("run_end", modules=len(handles))
     return host, handles
 

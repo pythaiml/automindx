@@ -63,6 +63,7 @@ class Host:
         self._handlers: Dict[str, List[Callable[[Any], None]]] = {}
         self._call_model = call_model
         self._prompt_prefix = ""            # set by individuality-core
+        self.memory = None                  # gitmind memory tree, attached by boot()
         os.makedirs(self.store.modules_dir, exist_ok=True)
         ident = self.store.read_json("identity.json", default={}) or {}
         self.identity_id: str = ident.get("id") or "sagi"
