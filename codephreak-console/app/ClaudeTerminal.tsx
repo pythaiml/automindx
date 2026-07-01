@@ -18,7 +18,7 @@ export type TermCtl = {
   claudeInteractive: (prompt: string, opts?: { goal?: string; quietMs?: number; timeoutMs?: number }) => Promise<'ready' | 'timeout' | 'login-required'>;
 };
 
-export default function ClaudeTerminal({ onClose, onStartSagi, onReady }: { onClose: () => void; onStartSagi?: () => void; onReady?: (ctl: TermCtl) => void }) {
+export default function ClaudeTerminal({ onClose, onStartSagi, onReady, onClaude }: { onClose: () => void; onStartSagi?: () => void; onReady?: (ctl: TermCtl) => void; onClaude?: () => void }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const refitRef = useRef<() => void>(() => {});
   const sendRef = useRef<(s: string) => void>(() => {});
@@ -170,6 +170,7 @@ export default function ClaudeTerminal({ onClose, onStartSagi, onReady }: { onCl
           <i className="tl-amber" title="minimize" onPointerDown={stop} onClick={() => setMode((m) => (m === 'min' ? 'normal' : 'min'))} />
           <i className="tl-green" title="start Claude + sAGI build — opens the sAGI card to choose interactions" onPointerDown={stop} onClick={startClaudeSagi} />
         </span>
+        {onClaude && <button className="term-claude" onPointerDown={(e) => e.stopPropagation()} onClick={onClaude} title="activate Claude — start interactive claude and inject the autonomous sAGI /plan ultracode prompt">◆ Claude</button>}
         <span className="term-title">⌘ Claude terminal — subscription CLI · project: automindX</span>
         <span className="term-win-btns" onPointerDown={(e) => e.stopPropagation()}>
           <button className="btn ghost sm icon" title="minimize" onClick={() => setMode((m) => (m === 'min' ? 'normal' : 'min'))}>—</button>
