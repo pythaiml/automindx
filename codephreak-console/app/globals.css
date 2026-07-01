@@ -465,3 +465,11 @@ h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -.01em; }
 .term-claude:hover { background: rgba(46,230,166,.22); box-shadow: 0 0 12px -2px var(--accent); }
 .sagi-subtab.sov { border-color: rgba(245,196,81,.4); }
 .sagi-subtab.sov.active { color: var(--gold); border-color: rgba(245,196,81,.6); background: linear-gradient(180deg, rgba(245,196,81,.12), transparent); }
+
+/* Saner .persona editor — labeled fields instead of a cramped button jumble. */
+.persona-editor { display: flex; flex-direction: column; gap: 12px; }
+.persona-editor .fld { display: flex; align-items: center; gap: 12px; margin: 0; }
+.persona-editor .fld.col { flex-direction: column; align-items: stretch; gap: 6px; }
+.persona-editor .fld-l { min-width: 96px; font-size: 12.5px; color: var(--dim); }
+.persona-editor .fld.col .fld-l { min-width: 0; }
+.persona-editor .fld > input, .persona-editor .fld > select { flex: 1; }
