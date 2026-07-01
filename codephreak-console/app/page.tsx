@@ -88,6 +88,12 @@ const SUGGEST_POOL: Record<'sagi' | 'codephreak', string[]> = {
 };
 
 export default function Console() {
+  // Mount guard: this dashboard reads localStorage in many useState initializers
+  // (sagiSteps, sagiModel, prefs, history, …). Rendering those during SSR then
+  // re-rendering with the stored values on the client causes hydration mismatches.
+  // Render a deterministic shell until mounted, then the real UI (client-only).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [tab, setTab] = useState('chat');
   const [think, setThink] = useState(true);
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
@@ -378,6 +384,8 @@ export default function Console() {
   }, [isSagiPersona, sagiDisk.count, sessions.length]);
 
   const sub = PERSONA_SUBSTRATE[sagi ? 'savante' : activePersona] || PERSONA_SUBSTRATE.codephreak;
+  // Deterministic shell for SSR / first paint — avoids any localStorage hydration mismatch.
+  if (!mounted) return <div className="app" suppressHydrationWarning />;
   return (
     <>
     <Substrate a={sub.a} b={sub.b} seed={sub.seed} flux={sagiRunning ? 0.85 : status === 'submitted' ? 0.4 : status === 'streaming' ? 0.7 : 0} />
