@@ -34,3 +34,6 @@ sagi/.history/
 
 # sAGI standing goal (runtime)
 sagi/goal.txt
+
+# sAGI gitmind memory tree (runtime object store)
+sagi/.gitmind/
