@@ -28,6 +28,13 @@ void main(){
   // bright synaptic filaments that flare when thinking
   col += u_b * (0.10 + 0.55*u_flux) * smoothstep(0.78, 0.97, f);
   col += u_a * 0.25 * u_flux * smoothstep(0.6, 0.75, f);
+  // Living thoughts: percolating cells that rise and pulse — bubbling while thinking.
+  vec2 bp = p * 2.3 + vec2(u_seed, 0.0);
+  bp.y -= u_time * (0.25 + 0.65 * u_flux);            // rise (percolate upward)
+  float cells = fbm(bp + 0.8 * r);
+  float bub = smoothstep(0.52, 0.70, cells) * (1.0 - smoothstep(0.80, 0.95, cells)); // blob rings
+  bub *= 0.55 + 0.45 * sin(u_time * 2.2 + cells * 10.0);   // bubbling shimmer
+  col += mix(u_a, u_b, 0.35 + 0.65 * cells) * max(bub, 0.0) * (0.05 + 0.8 * u_flux);
   float vig = smoothstep(1.3, 0.15, length(uv-0.5));
   gl_FragColor = vec4(col * vig, 1.0);
 }`;
