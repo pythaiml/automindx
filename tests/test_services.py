@@ -57,6 +57,24 @@ def test_config_defaults():
     assert settings.max_context >= 1 and settings.ollama_host.startswith("http")
 
 
+def test_self_audit_scanner_is_confined_and_filtered():
+    import textwrap
+    from services.self_audit import SelfAudit
+    root = tempfile.mkdtemp()
+    os.makedirs(os.path.join(root, "node_modules"))
+    open(os.path.join(root, "node_modules", "junk.js"), "w").write("x")
+    open(os.path.join(root, "app.py"), "w").write("print('hi')")
+    open(os.path.join(root, "logo.png"), "wb").write(b"\x89PNG")
+    sa = SelfAudit(root)
+    tree = sa.tree()
+    assert "app.py" in tree
+    assert not any("node_modules" in t for t in tree)   # dep dir skipped
+    assert "logo.png" not in tree                        # binary skipped
+    # path confinement: cannot read outside the root
+    assert sa.read_file("../../../etc/passwd") is None
+    assert sa.read_file("app.py").startswith("print")
+
+
 def test_secrets_env_fallback_and_redaction(monkeypatch=None):
     from services.secrets import get_secret, redact
     os.environ["AUTOMINDX_TEST_SECRET"] = "supersecretvalue"

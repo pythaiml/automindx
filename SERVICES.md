@@ -96,6 +96,30 @@ reg.set_latest("v1.0")  # rollback
 `ModelService` pulls the Ollama cloud key through it. Store one with
 `set_secret("OLLAMA_API_KEY", value)` (goes to the keyring, not disk).
 
+## Real self-audit — codephreak reads the filesystem
+
+`services/self_audit.py` gives Professor Codephreak **read-only** access to the
+actual source so it audits the real code instead of a hypothetical architecture:
+
+```bash
+python3 -m services.self_audit                          # grounded self-audit
+python3 -m services.self_audit --focus security
+python3 -m services.self_audit --file services/model_service.py   # read one file
+```
+
+```python
+from services import SelfAudit
+sa = SelfAudit(".")
+sa.tree()          # files codephreak may read (dep/build dirs + binaries excluded)
+sa.read_file(rel)  # one file, path-confined
+sa.audit(focus)    # feeds the real source to codephreak → grounded report
+```
+
+Safety: every path is confined to the repo root (realpath check — no traversal),
+binaries/large files and `node_modules`/`.git`/`models`/`.next` are skipped, and a
+character budget caps how much source is sent to the model. Read-only — codephreak
+inspects code, it does not execute or modify it.
+
 ## Container hardening (Podman)
 
 Run the engine in a rootless, resource-capped **Podman** container:

@@ -17,7 +17,9 @@ from .model_service import ModelService
 from .inference_orchestrator import InferenceOrchestrator
 from .model_registry import ModelRegistry          # audit #9 — versioned config + integrity
 from .secrets import get_secret, set_secret, redact  # audit #10 — secrets management
+from .self_audit import SelfAudit                    # codephreak reads the FS to self-audit
 
 # RAGE semantic memory (pgvector) is optional; imported lazily by get_memory().
 __all__ = ["settings", "MemoryService", "get_memory", "ModelService",
-           "InferenceOrchestrator", "ModelRegistry", "get_secret", "set_secret", "redact"]
+           "InferenceOrchestrator", "ModelRegistry", "get_secret", "set_secret",
+           "redact", "SelfAudit"]
