@@ -198,7 +198,9 @@ python3 uiux.py \
 - Original codephreak (historical) — <https://github.com/Professor-Codephreak/automind>
 - **mindX** — the production system aGLM was distilled from · docs: **[mindx.pythai.net/docs.html](https://mindx.pythai.net/docs.html)**
 - **[rage.pythai.net](https://rage.pythai.net)** — the public broadcast layer ("public noise"), where mindX publishes in the voice of mindX via its **AuthorAgent**; Professor Codephreak has published there occasionally
-- **Songs** — the personas appear in music by **mag-magnus** on the album **[*Take it, Own it.*](https://soundcloud.com/mag-magnus/sets/takit-1)**: [Professor Codephreak — Deep Dark Mix](https://soundcloud.com/mag-magnus/professor-code-freak-deep-dark-mix-2) · [Terminal Recursion 5 (feat. Savante)](https://soundcloud.com/mag-magnus/terminal-recursion-5)
+- **Songs** — the personas appear in music by **[Mag Magnus](https://soundcloud.com/mag-magnus)** (authored by Magnusson):
+
+  [![Take it, Own it.](https://img.shields.io/badge/SoundCloud-Take_it_Own_it-ff5500?logo=soundcloud&logoColor=white&style=for-the-badge)](https://soundcloud.com/mag-magnus/sets/takit-1) &nbsp; [![Professor Codephreak — Deep Dark Mix](https://img.shields.io/badge/SoundCloud-Codephreak_Deep_Dark_Mix-ff5500?logo=soundcloud&logoColor=white&style=for-the-badge)](https://soundcloud.com/mag-magnus/professor-code-freak-deep-dark-mix-2) &nbsp; [![Terminal Recursion 5 — feat. Savante](https://img.shields.io/badge/SoundCloud-Terminal_Recursion_5_Savante-ff5500?logo=soundcloud&logoColor=white&style=for-the-badge)](https://soundcloud.com/mag-magnus/terminal-recursion-5)
 
 > **RAGE remembers · aGLM decides · MASTERMIND orchestrates.**
 
