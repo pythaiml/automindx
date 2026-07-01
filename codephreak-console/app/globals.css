@@ -315,3 +315,15 @@ h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -.01em; }
 .topbar { position: sticky; top: 0; z-index: 25; }
 .savebar { z-index: 8; }
 .msg .av { position: relative; z-index: 2; }
+
+/* Live generation indicator (event feedback while awaiting a response). */
+.genstat {
+  display: inline-flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  padding: 6px 12px; border-radius: 999px; font-size: 12px; color: var(--accent);
+  background: linear-gradient(180deg, rgba(46,230,166,.12), rgba(46,230,166,.05));
+  border: 1px solid rgba(46,230,166,.28); box-shadow: var(--bevel);
+  animation: genpulse 1.6s ease-in-out infinite;
+}
+.genstat .mono { color: var(--dim); }
+@keyframes genpulse { 0%,100% { box-shadow: var(--bevel), 0 0 0 0 rgba(46,230,166,.0); } 50% { box-shadow: var(--bevel), 0 0 16px -2px rgba(46,230,166,.5); } }
+.pill.livecount { border-color: rgba(46,230,166,.4); color: var(--accent); animation: genpulse 1.6s ease-in-out infinite; }
