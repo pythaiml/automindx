@@ -327,3 +327,7 @@ h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -.01em; }
 .genstat .mono { color: var(--dim); }
 @keyframes genpulse { 0%,100% { box-shadow: var(--bevel), 0 0 0 0 rgba(46,230,166,.0); } 50% { box-shadow: var(--bevel), 0 0 16px -2px rgba(46,230,166,.5); } }
 .pill.livecount { border-color: rgba(46,230,166,.4); color: var(--accent); animation: genpulse 1.6s ease-in-out infinite; }
+
+/* Heart / broken-heart reaction glyphs flanking the thumbs feedback. */
+.react { cursor: pointer; font-size: 13px; line-height: 1; user-select: none; transition: transform .12s, opacity .12s; }
+.react:hover { transform: scale(1.25); opacity: 1 !important; }
