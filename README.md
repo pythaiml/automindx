@@ -17,7 +17,7 @@ environment. Project codename: **codephreak**.
 
 ---
 
-## ⚡ Quickstart — the modern, actually-loads path (Ollama)
+## ⚡ Quickstart — the modern path (Ollama)
 
 The classic `uiux.py` / `hfUIUX.py` load a multi-GB model **before** the UI
 renders, so on modest hardware the window may never appear. `ollama_codephreak.py`
