@@ -84,3 +84,4 @@ these seed specs and code are what's version-controlled.
 - **mindX `/mindx/gitmind`** · **Forgejo** — the git-based-memory / self-hosted-forge lineage
 - [SERVICES.md](SERVICES.md) — the RAGE / pgvector service layer
 - [../sagi/README.md](../sagi/README.md) · [../sagi/POINT_OF_DEPARTURE.md](../sagi/POINT_OF_DEPARTURE.md)
+- <a href="https://rage.pythai.net/save-the-trees-professor-codephreak-automindx/">Save the trees</a>
